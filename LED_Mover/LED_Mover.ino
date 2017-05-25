@@ -78,7 +78,7 @@ void dmpDataReady() {
 
 void setup() {
   // put your setup code here, to run once:
-  setupI2C();
+  //setupI2C();
   setupLedAnimations();
 
 }
@@ -142,9 +142,9 @@ void setupI2C()
 
         // enable Arduino interrupt detection
         Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
-        mpuIntStatus = mpu.getIntStatus();
-
+        //attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+        //mpuIntStatus = mpu.getIntStatus();
+        mpuIntStatus = 1;
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
         Serial.println(F("DMP ready! Waiting for first interrupt..."));
         dmpReady = true;
@@ -197,10 +197,9 @@ bool initialized = false; //initialize the canvas & brushes in each loop when ze
     Serial.print(r);
     Serial.print("\n");
     
-    if( r >7)
+    if( r >7 || 1==1)
     {
-     initI2C();
-     doLeds();
+      doUserInput();
     }
     else if(r>=4 && r<=6)
     {
@@ -237,6 +236,7 @@ void doUserInput()
 void doLeds()
 {
        initialized = false;
+       
       //raindbowPaint();
      // bouncyBalls();
      // initialized = false;
@@ -247,6 +247,7 @@ void doLeds()
   void dripRead()
 {
   boolean backward = true;
+  
   int speed = readRoll() * 20; 
   int lastSpeed = speed;
         
@@ -307,66 +308,7 @@ void doLeds()
   }
 }
 
-void drip()
-{
-  boolean backward = true;
-  static signed int speed = 0; 
-  //for(loopcounter = 0; loopcounter < duration; loopcounter++)
-  while(true)
-  {
-      static unsigned int hue = 0; //color hue to set to brush
-      
-      HSV brushcolor; //HSV color definition
-      
 
-      if (initialized == false) //initialize the brushes
-      {
-        initialized = true;
-        pixelbrush.setFadeSpeed(90);
-        pixelbrush.setFadein(false); //brightness will fade-in if set to true
-        pixelbrush.setFadeout(true);
-        pixelbrush.setBounce(false);
-      }
-
-      if(backward)
-      {
-        speed -= 1;
-        brushcolor.h = 200; 
-      }
-      else
-      {
-       speed += 1;
-       brushcolor.h = 100; 
-      }
-
-      if(speed > 300)
-      {
-        backward = true;
-      }
-      else if(speed < -300)
-        backward = false;
-
-      Serial.print("speed");
-      Serial.print(speed);
-      Serial.print("\n");
-        
-      pixelbrush.setSpeed(speed); //brush moving speed 
-
-      //hue++;
-      //brushcolor.h = hue; //divide by 3 to slow down color fading
-      brushcolor.s = 255; //full saturation
-      brushcolor.v = 255; //full brightness
-
-      pixelbrush.setColor(brushcolor); //set new color to the bursh
-  
-      neopixels.clear();
-  
-      pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
-      pixelcanvas.transfer(); //transfer (add) the canvas to the neopixels
-  
-      neopixels.show();
-  }
-}
 
 void ledAnimationBundle()
 {
@@ -390,6 +332,43 @@ void ledAnimationBundle()
   twoBrushColorMixing();
   }
 
+}
+
+void rainbowBlink()
+{
+     Serial.println(F("rainbow blink"));
+    //the brush moves along the strip, leaving a colorful rainbow trail
+    for(loopcounter = 0; loopcounter<100; loopcounter++) 
+    {
+      static unsigned int hue = 0; //color hue to set to brush
+      HSV brushcolor; //HSV color definition
+  
+  
+      if (initialized == false) //initialize the brushes
+      {
+        initialized = true;
+        pixelbrush.setSpeed(random(200) + 200); //brush moving speed 
+        pixelbrush.setFadeSpeed(90);
+        pixelbrush.setFadein(false); //brightness will fade-in if set to true
+        pixelbrush.setFadeout(true);
+        pixelbrush.setBounce(false);
+      }
+  
+      hue++;
+      brushcolor.h = hue / 3; //divide by 3 to slow down color fading
+      brushcolor.s = 255; //full saturation
+      brushcolor.v = 255; //full brightness
+  
+      pixelbrush.setColor(brushcolor); //set new color to the bursh
+  
+      neopixels.clear();
+  
+      pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
+      pixelcanvas.transfer(); //transfer (add) the canvas to the neopixels
+  
+      neopixels.show();
+    }
+  
 }
     //---------------------
   //RAINBOW PAINT (aka nyan cat)
@@ -892,7 +871,86 @@ void twoBrushColorMixing()
   }
 }
 
-void initI2C()
+
+void initI2C() {
+    // join I2C bus (I2Cdev library doesn't do this automatically)
+    #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+        Wire.begin();
+        Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+    #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+        Fastwire::setup(400, true);
+    #endif
+
+    // initialize serial communication
+    // (115200 chosen because it is required for Teapot Demo output, but it's
+    // really up to you depending on your project)
+    Serial.begin(115200);
+    rainbowBlink();  
+    //while (!Serial); // wait for Leonardo enumeration, others continue immediately
+  
+    // NOTE: 8MHz or slower host processors, like the Teensy @ 3.3v or Ardunio
+    // Pro Mini running at 3.3v, cannot handle this baud rate reliably due to
+    // the baud timing being too misaligned with processor ticks. You must use
+    // 38400 or slower in these cases, or use some kind of external separate
+    // crystal solution for the UART timer.
+
+    // initialize device
+    Serial.println(F("Initializing I2C devices..."));
+    mpu.initialize();
+    pinMode(INTERRUPT_PIN, INPUT);
+
+    // verify connection
+    Serial.println(F("Testing device connections..."));
+    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+
+    // wait for ready
+    Serial.println(F("\nSend any character to begin DMP programming and demo: "));
+   // while (Serial.available() && Serial.read()); // empty buffer
+    //while (!Serial.available());                 // wait for data
+    // while (Serial.available() && Serial.read()); // empty buffer again
+
+    // load and configure the DMP
+    Serial.println(F("Initializing DMP..."));
+    devStatus = mpu.dmpInitialize();
+
+    // supply your own gyro offsets here, scaled for min sensitivity
+    mpu.setXGyroOffset(220);
+    mpu.setYGyroOffset(76);
+    mpu.setZGyroOffset(-85);
+    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+
+    // make sure it worked (returns 0 if so)
+    if (devStatus == 0) {
+        // turn on the DMP, now that it's ready
+        Serial.println(F("Enabling DMP..."));
+        mpu.setDMPEnabled(true);
+
+        // enable Arduino interrupt detection
+        Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
+        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+        mpuIntStatus = mpu.getIntStatus();
+
+        // set our DMP Ready flag so the main loop() function knows it's okay to use it
+        Serial.println(F("DMP ready! Waiting for first interrupt..."));
+        dmpReady = true;
+
+        // get expected DMP packet size for later comparison
+        packetSize = mpu.dmpGetFIFOPacketSize();
+    } else {
+        // ERROR!
+        // 1 = initial memory load failed
+        // 2 = DMP configuration updates failed
+        // (if it's going to break, usually the code will be 1)
+        Serial.print(F("DMP Initialization failed (code "));
+        Serial.print(devStatus);
+        Serial.println(F(")"));
+    }
+
+    // configure LED for output
+    pinMode(LED_PIN, OUTPUT);
+}
+
+void initI2C_custom()
 {
   Serial.print(F("here"));
     // if programming failed, don't try to do anything
@@ -929,6 +987,7 @@ Serial.print(F("here2"));
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
     
     }
+
 
     Serial.print(F("here3"));
 }
@@ -975,6 +1034,67 @@ float readRoll()
 
         return roll;
     }
+}
+
+void drip()
+{
+  boolean backward = true;
+  static signed int speed = 0; 
+  //for(loopcounter = 0; loopcounter < duration; loopcounter++)
+  while(true)
+  {
+      static unsigned int hue = 0; //color hue to set to brush
+      
+      HSV brushcolor; //HSV color definition
+      
+
+      if (initialized == false) //initialize the brushes
+      {
+        initialized = true;
+        pixelbrush.setFadeSpeed(90);
+        pixelbrush.setFadein(false); //brightness will fade-in if set to true
+        pixelbrush.setFadeout(true);
+        pixelbrush.setBounce(false);
+      }
+
+      if(backward)
+      {
+        speed -= 1;
+        brushcolor.h = 200; 
+      }
+      else
+      {
+       speed += 1;
+       brushcolor.h = 100; 
+      }
+
+      if(speed > 300)
+      {
+        backward = true;
+      }
+      else if(speed < -300)
+        backward = false;
+
+      Serial.print("speed");
+      Serial.print(speed);
+      Serial.print("\n");
+        
+      pixelbrush.setSpeed(speed); //brush moving speed 
+
+      //hue++;
+      //brushcolor.h = hue; //divide by 3 to slow down color fading
+      brushcolor.s = 255; //full saturation
+      brushcolor.v = 255; //full brightness
+
+      pixelbrush.setColor(brushcolor); //set new color to the bursh
+  
+      neopixels.clear();
+  
+      pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
+      pixelcanvas.transfer(); //transfer (add) the canvas to the neopixels
+  
+      neopixels.show();
+  }
 }
 
 
