@@ -13,7 +13,7 @@ post the code on the GitHub repository by opening a new issue.
 I will then add it as a demo (with proper attribution).
 */
 
-const int duration = 2000; //number of loops to run each animation for
+const int duration = 10000; //number of loops to run each animation for was 2000
 
 #define NUMBEROFPIXELS 60 //Number of LEDs on the strip
 #define PIXELPIN 6 //Pin where WS281X pixels are connected
@@ -71,7 +71,7 @@ void loop() {
 		if (initialized == false) //initialize the brushes
 		{
 			initialized = true;
-			pixelbrush.setSpeed(500); //brush moving speed 
+			pixelbrush.setSpeed(random(200) + 100); //brush moving speed 
 			pixelbrush.setFadeSpeed(90);
 			pixelbrush.setFadein(false); //brightness will fade-in if set to true
 			pixelbrush.setFadeout(true);

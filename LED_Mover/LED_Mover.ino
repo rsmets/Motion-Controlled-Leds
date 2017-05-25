@@ -6,7 +6,7 @@
 /*
  * NeoPixel animation members, constants, headers 
  */
-const int duration = 2000; //number of loops to run each animation for
+const int duration = 4000; //number of loops to run each animation for
 
 #define NUMBEROFPIXELS 60 //Number of LEDs on the strip
 #define PIXELPIN 6 //Pin where WS281X pixels are connected
@@ -80,6 +80,7 @@ void setup() {
   // put your setup code here, to run once:
   setupI2C();
   setupLedAnimations();
+
 }
 
 // ================================================================
@@ -196,10 +197,14 @@ bool initialized = false; //initialize the canvas & brushes in each loop when ze
     Serial.print(r);
     Serial.print("\n");
     
-    if( r >6 )
+    if( r >7)
     {
      initI2C();
      doLeds();
+    }
+    else if(r>=4 && r<=6)
+    {
+      doSlowAnimations();
     }
     else
     {
@@ -207,6 +212,21 @@ bool initialized = false; //initialize the canvas & brushes in each loop when ze
     }
 
   }
+
+void doSlowAnimations()
+{
+
+    while(true)
+  {
+   initialized = false;
+  twinkleStars();
+   initialized = false;
+  hueDemo();
+   initialized = false;
+  twoBrushColorMixing();
+  }
+
+}
 
 void doUserInput()
 {
@@ -232,6 +252,7 @@ void doLeds()
         
   static unsigned int hue = 0; //color hue to set to brush
   HSV brushcolor; //HSV color definition
+  brushcolor.h = random(255); //random color
    long count = 0;
    
   //for(loopcounter = 0; loopcounter < duration; loopcounter++)
@@ -254,6 +275,11 @@ void doLeds()
         Serial.println(F("restarting"));
         doUserInput();
       }
+      else if(speed > 0 && lastSpeed < 0 ||
+              speed < 0 && lastSpeed > 0)
+      {
+        brushcolor.h = random(255); //random color
+      }
       
       Serial.print("speed");
       Serial.print(speed);
@@ -267,7 +293,8 @@ void doLeds()
       //hue++;
       //brushcolor.h = hue; //divide by 3 to slow down color fading
       brushcolor.s = 255; //full saturation
-      brushcolor.v = 255; //full brightness
+      //brushcolor.v = 255; //full brightness
+      brushcolor.v = random(100)+ 155; //random (peak) brighness
 
       pixelbrush.setColor(brushcolor); //set new color to the bursh
   
@@ -348,9 +375,9 @@ void ledAnimationBundle()
       initialized = false;
   rainbowPaint();
   initialized = false;
-  //sparkler();
-   //initialized = false;
-  //twinkleStars();
+  sparkler();
+   initialized = false;
+  twinkleStars();
    initialized = false;
   chaser();
    initialized = false;
@@ -369,7 +396,7 @@ void ledAnimationBundle()
   //---------------------
   void rainbowPaint()
   {
-    Serial.print(F("rainbow paint"));
+    Serial.println(F("rainbow paint"));
     //the brush moves along the strip, leaving a colorful rainbow trail
     for(loopcounter = 0; loopcounter<duration; loopcounter++) 
     {
@@ -380,7 +407,7 @@ void ledAnimationBundle()
       if (initialized == false) //initialize the brushes
       {
         initialized = true;
-        pixelbrush.setSpeed(500); //brush moving speed 
+        pixelbrush.setSpeed(random(200) + 200); //brush moving speed 
         pixelbrush.setFadeSpeed(90);
         pixelbrush.setFadein(false); //brightness will fade-in if set to true
         pixelbrush.setFadeout(true);
@@ -406,7 +433,7 @@ void ledAnimationBundle()
 //SPARKLER: a brush seeding sparkles
 void sparkler()
 {
-  Serial.print(F("sparkler"));
+  Serial.println(F("sparkler"));
    for(loopcounter = 0; loopcounter<duration; loopcounter++) 
    {
 
@@ -442,7 +469,7 @@ void sparkler()
 //---------------------
 void twinkleStars()
 {
-  Serial.print(F("twinkler stars"));
+  Serial.println(F("twinkler stars"));
   //brush set to random positions and painting a fading star
   for(loopcounter = 0; loopcounter<duration; loopcounter++) 
   {
@@ -488,7 +515,7 @@ void twinkleStars()
 //-------------
 void chaser()
 {
-  Serial.print(F("chaser"));
+  Serial.println(F("chaser"));
 
   // two brushes chasing each other, one painting the pixel in a color, the other one painting 'black' (acting on the same canvas)
   
@@ -517,14 +544,14 @@ void chaser()
         brushcolor.v = 150; 
 
         //initialize the first brush to move and paint a color, no fading 
-        pixelbrush.setSpeed(900); //moving speed
+        pixelbrush.setSpeed(300); //moving speed was 900 but too fast for teensy
         pixelbrush.setColor(brushcolor);
         pixelbrush.setFadeout(false); //deactivate fade-out (was activated in last animation)
         pixelbrush.setFadein(false); //deactivate fade-in 
         pixelbrush2.moveTo(0); //move the brush to pixel 0
         //initialize the second brush to move at the same speed but starting at a different position (default position is 0)
         brushcolor.v = 0; //zero intensity = black
-        pixelbrush2.setSpeed(900);
+        pixelbrush2.setSpeed(300); //moving speed was 900 but too fast for teensy
         pixelbrush2.setColor(brushcolor);
         pixelbrush2.moveTo(2*NUMBEROFPIXELS/3); //move the brush 
 
@@ -547,7 +574,7 @@ void chaser()
 //------------------------------
 void hueDemo()
 {
-  Serial.print(F("hue demo"));
+  Serial.println(F("hue demo"));
   //hue fading can be done in two ways: change the color moving the shortest distance around the colorwheel (setFadeHueNear)
   //or intentionally moving around the colorwheel choosing the long way (setFadeHueFar)
   //two brushes move along the strip in different speeds, each painting a different color that the canvas will then fade to
@@ -618,10 +645,10 @@ void hueDemo()
 //three brushes painting on one canvas, all following each other at the same speed, painting fading pixels
 void speedTrails()
 {
-  Serial.print(F("speed trails"));
+  Serial.println(F("speed trails"));
   while(true) //create a loop with two additional brushes (are deleted automatically once the loop finishes)
   {
-    int brushspeed = 900;
+    int brushspeed = 300; //moving speed was 900 but too fast for teensy
 
     //create additional brushes, painting on the same canvas as the globally defined brush
     NeoPixelPainterBrush pixelbrush2 = NeoPixelPainterBrush(&pixelcanvas); 
@@ -692,7 +719,7 @@ void speedTrails()
 //three brushes painting on one canvas, attracted to the zero pixel as if by gravity
 void bouncyBalls()
 {
-  Serial.print(F("bouncy balls"));
+  Serial.println(F("bouncy balls"));
   while(true) //create a loop with two additional brushes (are deleted automatically once the loop finishes)
   {
 
@@ -752,9 +779,9 @@ void bouncyBalls()
       //  if (skipper % 5 == 0) //only apply gravity at some interval to make it slower on fast processors
       //  {
       //read current speed of each brush and speed it up in negative direction (towards pixel zero)
-      pixelbrush.setSpeed(pixelbrush.getSpeed() - 30); 
-      pixelbrush2.setSpeed(pixelbrush2.getSpeed() - 30);
-      pixelbrush3.setSpeed(pixelbrush3.getSpeed() - 30);
+      pixelbrush.setSpeed(pixelbrush.getSpeed() - 5); 
+      pixelbrush2.setSpeed(pixelbrush2.getSpeed() - 5);
+      pixelbrush3.setSpeed(pixelbrush3.getSpeed() - 5);
       //  }
       //  skipper++;
 
@@ -778,7 +805,7 @@ void bouncyBalls()
 //two brushes moving around randomly paint on their individual canvas, resulting in colors being mixed 
 void twoBrushColorMixing()
 {
-  Serial.print(F("two brush mix"));
+  Serial.println(F("two brush mix"));
   while(true) //create a loop with two additional brushes (are deleted automatically once the loop finishes)
   {
 
@@ -812,8 +839,8 @@ void twoBrushColorMixing()
         brushcolor.h = 8;
 
         //setup the first brush
-        pixelbrush.setSpeed(-750);
-        pixelbrush.setSpeedlimit(1000);
+        pixelbrush.setSpeed(-350); //was 750
+        pixelbrush.setSpeedlimit(400);
         pixelbrush.setFadeSpeed(random(80) + 50);
         pixelbrush.setFadeout(true);
         pixelbrush.setFadein(true);
@@ -823,8 +850,8 @@ void twoBrushColorMixing()
 
         //setup the second brush
         brushcolor.h = 160;
-        pixelbrush2.setSpeed(600);
-        pixelbrush2.setSpeedlimit(1000);
+        pixelbrush2.setSpeed(200); //was 600
+        pixelbrush2.setSpeedlimit(400);
         pixelbrush2.setFadeSpeed(random(80) + 50);
         pixelbrush2.setFadeout(true);
         pixelbrush2.setFadein(true);
