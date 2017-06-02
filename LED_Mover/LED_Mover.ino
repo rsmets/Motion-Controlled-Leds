@@ -197,7 +197,7 @@ bool initialized = false; //initialize the canvas & brushes in each loop when ze
     Serial.print(r);
     Serial.print("\n");
     
-    if( r >7 || 1==1)
+    if( r >7)
     {
       doUserInput();
     }
