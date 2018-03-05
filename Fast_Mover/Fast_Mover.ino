@@ -2,7 +2,7 @@
 
 /*
  * Using Jeff Rowberg I2C & MPU6050 library for the MPU6050 communications.
- * Also utilizing NoePixel painter libarary and some present animations from ____.
+ * Also utilizing FastLED painter libarary and some present animations from Damian Schneider.
  */
 
 /*
@@ -291,16 +291,20 @@ void doLeds()
                 animationNumber++;
                 Serial.print("programNotch: ");
                 Serial.print(programNotch);
+                Serial.print(" animationNumber: ");
+                Serial.print(animationNumber);
         }
         //raindbowPaint();
         // bouncyBalls();
         // initialized = false;
         //sparkler();
         //twoBrushColorMixing();
-        if(animationNumber % 2 ==  0)
+        if (animationNumber % 3 ==  0)
                 dripRead();
-        else
+        else if (animationNumber % 3 ==  1)
                 rainbowPaintRead();
+        else
+                sparklerRead();
 }
 
 void dripRead()
@@ -320,8 +324,7 @@ void dripRead()
         float pitch = ypr[1] * 180/M_PI;
         float roll = ypr[2] * 180/M_PI;
 
-        lastSpeed = speed;
-        speed = roll * 20;
+        updateSpeed(roll*20);
 
         if(speed > 0 && lastSpeed < 0 ||
            speed < 0 && lastSpeed > 0) {
@@ -423,7 +426,6 @@ void rainbowPaintRead()
         // for(loopcounter = 0; loopcounter<duration; loopcounter++)
         // {
         static unsigned int hue = 0; //color hue to set to brush
-        //CHSV brushcolor; //HSV color definition
 
 
         if (initialized == false) //initialize the brushes
@@ -440,7 +442,7 @@ void rainbowPaintRead()
         float pitch = ypr[1] * 180/M_PI;
         float roll = ypr[2] * 180/M_PI;
 
-        speed = roll * 20;
+        updateSpeed(roll*20);
         pixelbrush.setSpeed(speed); //brush moving speed
 
         hue++;
@@ -456,6 +458,14 @@ void rainbowPaintRead()
 
         pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
         pixelcanvas.transfer(); //transfer (add) the canvas to the FastLED
+
+        if (DEBUG_OUTPUT) {
+                Serial.print("speed: ");
+                Serial.print(speed);
+                Serial.print("\nbrightness: ");
+                Serial.print(brightness);
+                Serial.print("\n");
+        }
 
         FastLED.show();
         // }
@@ -497,6 +507,61 @@ void rainbowPaint()
 
                 FastLED.show();
         }
+}
+
+void updateSpeed(int s)
+{
+  lastSpeed = speed;
+  speed = s;
+}
+//SPARKLER: a brush seeding sparkles
+void sparklerRead()
+{
+        Serial.print(F("in sparklerRead\n"));
+
+        float yaw = ypr[0] * 180/M_PI;
+        float pitch = ypr[1] * 180/M_PI;
+        float roll = ypr[2] * 180/M_PI;
+
+        //updateSpeed(roll * 5 + 600);
+        if (initialized == false)
+        {
+                initialized = true;
+                if(speed > 0)
+                  pixelbrush.setSpeed(600);
+                else
+                  pixelbrush.setSpeed(-600);
+                pixelbrush.setFadeout(true);   //sparkles fade in
+                pixelbrush.setFadein(true);   //and fade out immediately after reaching the set brightness
+        }
+
+
+
+        int saturation = 255 - abs(pitch) * 2.8;
+
+        //set a new brush color in each loop
+        brushcolor.h = random(255);   //random color
+        brushcolor.s = saturation;  //random(130); //random but low saturation, giving white-ish sparkles
+        brushcolor.v = random(200);                //random (peak) brighness
+
+        pixelbrush.setColor(brushcolor);
+        pixelbrush.setFadeSpeed(random(100) + 150);   //set a new fadespeed with some randomness
+
+        FastLED.clear();
+
+        pixelbrush.paint();   //paint the brush to the canvas (and update the brush, i.e. move it a little)
+        pixelcanvas.transfer();   //transfer (add) the canvas to the FastLED
+
+        if (DEBUG_OUTPUT) {
+                Serial.print("speed: ");
+                Serial.print(speed);
+                Serial.print("\saturation: ");
+                Serial.print(saturation);
+                Serial.print("\n");
+        }
+
+        FastLED.show();
+
 }
 
 //SPARKLER: a brush seeding sparkles
