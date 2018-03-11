@@ -1,4 +1,8 @@
-#include <Wire.h>
+#include "Arduino.h"
+#include <FastLED.h>
+#include <FastLEDPainter.h>
+#include <EEPROM.h>
+
 
 /*
  * Using Jeff Rowberg I2C & MPU6050 library for the MPU6050 communications.
@@ -12,10 +16,6 @@ const int duration = 4000; //number of loops to run each animation for
 
 #define NUMBEROFPIXELS 144 //Number of LEDs on the strip
 #define PIXELPIN 6 //Pin where WS281X pixels are connected
-
-#include "Arduino.h"
-#include <FastLED.h>
-#include <FastLEDPainter.h>                                          // FastLED library. Preferably the latest copy of FastLED 2.1.
 
 #if FASTLED_VERSION < 3001000
 #error "Requires FastLED 3.1 or later; check github for latest code."
@@ -63,6 +63,10 @@ MPU6050 mpu;
 // more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
 #define OUTPUT_READABLE_YAWPITCHROLL
 const bool DEBUG_OUTPUT = true;
+const bool YAW_ANIMATION_CONTROL = false;
+const uint8_t DIAL_SENSITIVITY = 35;
+const uint8_t ADDRESS_ANIMATION_NUM = 0;
+const uint8_t ANIMATION_COUNT = 3;
 
 bool blinkState = false;
 
@@ -83,11 +87,12 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-uint8_t r;
+uint8_t randomShow;
 uint8_t animationNumber;
 uint16_t programNotch;
-static signed int speed = 0;
+static signed int speed = 1;
 static signed int lastSpeed = speed;
+byte eprom;
 
 //static unsigned int hue = 0; //color hue to set to brush
 CHSV brushcolor; //HSV color definition
@@ -108,11 +113,69 @@ void setup() {
 
         //setupI2C();
         setupLedAnimations();
-        r = random(10);
+        randomShow = random(10);
         Serial.print("random number is:");
-        Serial.print(r);
+        Serial.print(randomShow);
         Serial.print("\n");
 
+        batteryCheck();
+
+        animationNumber = EEPROM.read(ADDRESS_ANIMATION_NUM);
+        Serial.print("ANIMATION EEPROM :");
+        Serial.print(animationNumber);
+        Serial.print("\n");
+
+        if(!YAW_ANIMATION_CONTROL)
+                saveAnimationNum((animationNumber + 1) % ANIMATION_COUNT);
+
+}
+
+void blink(float voltage) {
+        int blinkCount = 0;
+        if(voltage > 4.2)
+                blinkCount = 5;
+        else if(voltage > 4.0)
+                blinkCount = 4;
+        else if(voltage > 3.8)
+                blinkCount = 3;
+        else if(voltage > 3.6)
+                blinkCount = 2;
+        else if(voltage > 3.4)
+                blinkCount = 1;
+
+        for(int i = 0; i < blinkCount; i++) {
+                pixelbrush.setFadeSpeed(90);
+                pixelbrush.setFadein(false); //brightness will fade-in if set to true
+                pixelbrush.setFadeout(true);
+                pixelbrush.setBounce(false);
+
+                pixelbrush.setSpeed(0); //brush moving speed
+
+                brushcolor.s = 255; //full saturation
+                int brightness = 255;
+                brushcolor.v = brightness; //random (peak) brighness
+
+                pixelbrush.setColor(brushcolor); //set new color to the bursh
+
+                FastLED.clear();
+                FastLED.show();
+                delay(200);
+
+                pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
+                pixelcanvas.transfer(); //transfer (add) the canvas to the FastLED
+
+                FastLED.show();
+                delay(200);
+        }
+}
+
+void batteryCheck() {
+        int sensorValue = analogRead(A0); //read the A0 pin value
+        float voltage = sensorValue * (5.00 / 1600.00) * 2; //convert the value to a true voltage.
+        blink(voltage);
+        Serial.print("voltage = ");
+        Serial.print(voltage); //print the voltage to LCD
+        Serial.print(" V");
 }
 
 // ================================================================
@@ -206,7 +269,7 @@ void setupLedAnimations()
 
         Serial.begin(115200);
         Serial.println(" ");
-        Serial.println("FastLED Painter Demo");
+        Serial.println("Ray's rave stave begin");
 
         //check if ram allocation of brushes and canvases was successful (painting will not work if unsuccessful, program should still run though)
         //this check is optional but helps to check if something does not work, especially on low ram chips like the Arduino Uno
@@ -228,12 +291,13 @@ bool initialized = false; //initialize the canvas & brushes in each loop when ze
 void loop()
 {
 //ledAnimationBundle();
+        //blink();
         doUserInput();
-        if( r >7)
+        if( randomShow >7)
         {
                 doUserInput();
         }
-        else if(r>=4 && r<=6)
+        else if(randomShow>=4 && randomShow<=6)
         {
                 doSlowAnimations();
         }
@@ -262,13 +326,17 @@ void doSlowAnimations()
 void doUserInput()
 {
         initI2C();
-        readRoll();
-        float yaw = ypr[0] * 180/M_PI;
-        float pitch = ypr[1] * 180/M_PI;
-        float roll = ypr[2] * 180/M_PI;
-        programNotch = abs(yaw);
-        Serial.print("programNotch: ");
-        Serial.print(programNotch);
+        readMpu();
+
+        if(YAW_ANIMATION_CONTROL) {
+                float yaw = ypr[0] * 180/M_PI;
+                float pitch = ypr[1] * 180/M_PI;
+                float roll = ypr[2] * 180/M_PI;
+                programNotch = abs(yaw);
+                Serial.print("programNotch: ");
+                Serial.print(programNotch);
+        }
+
         while(true)
         {
                 doLeds();
@@ -280,31 +348,83 @@ void doLeds()
 {
         initialized = false;
 
-        readRoll();
+        readMpu();
         float yaw = ypr[0] * 180/M_PI;
         float pitch = ypr[1] * 180/M_PI;
         float roll = ypr[2] * 180/M_PI;
-        int programNotchNow = abs(yaw);
-        if(abs(programNotchNow - programNotch) > 25)
+
+        if(YAW_ANIMATION_CONTROL)
         {
-                programNotch = abs(yaw);
-                animationNumber++;
-                Serial.print("programNotch: ");
-                Serial.print(programNotch);
-                Serial.print(" animationNumber: ");
-                Serial.print(animationNumber);
+                int programNotchNow = abs(yaw);
+                if(abs(programNotchNow - programNotch) > DIAL_SENSITIVITY) {
+
+                        programNotch = abs(yaw);
+                        animationNumber = (++animationNumber)%3;
+                        saveAnimationNum(animationNumber);
+                        if(DEBUG_OUTPUT) {
+                                Serial.print("new programNotch: ");
+                                Serial.print(programNotch);
+                                Serial.print(" new animationNumber: ");
+                                Serial.print(animationNumber);
+                        }
+                }
         }
         //raindbowPaint();
         // bouncyBalls();
         // initialized = false;
         //sparkler();
         //twoBrushColorMixing();
-        if (animationNumber % 3 ==  0)
+        if(DEBUG_OUTPUT) {
+                Serial.print("\nanimationNumber: ");
+                Serial.print(animationNumber);
+                Serial.print(" ");
+        }
+
+        if (animationNumber % ANIMATION_COUNT ==  0) {
                 dripRead();
-        else if (animationNumber % 3 ==  1)
+        }
+        else if (animationNumber % ANIMATION_COUNT ==  1) {
                 rainbowPaintRead();
-        else
+        }
+        else {
                 sparklerRead();
+        }
+
+        if(DEBUG_OUTPUT && YAW_ANIMATION_CONTROL) {
+                Serial.print("next programNotch [ ");
+                Serial.print(programNotch - DIAL_SENSITIVITY);
+                Serial.print(" <-> ");
+                Serial.print(programNotch + DIAL_SENSITIVITY);
+                Serial.print(" ]\n");
+        }
+}
+
+void saveAnimationNum(int number) {
+
+        EEPROM.write(ADDRESS_ANIMATION_NUM, number);
+
+        // /***
+        //   Advance to the next address, when at the end restart at the beginning.
+        //
+        //   Larger AVR processors have larger EEPROM sizes, E.g:
+        //   - Arduno Duemilanove: 512b EEPROM storage.
+        //   - Arduino Uno:        1kb EEPROM storage.
+        //   - Arduino Mega:       4kb EEPROM storage.
+        //
+        //   Rather than hard-coding the length, you should use the pre-provided length function.
+        //   This will make your code portable to all AVR processors.
+        // ***/
+        // addr = addr + 1;
+        // if (addr == EEPROM.length()) {
+        //   addr = 0;
+        // }
+        //
+        // /***
+        //   As the EEPROM sizes are powers of two, wrapping (preventing overflow) of an
+        //   EEPROM address is also doable by a bitwise and of the length - 1.
+        //
+        //   ++addr &= EEPROM.length() - 1;
+        // ***/
 }
 
 void dripRead()
@@ -511,8 +631,8 @@ void rainbowPaint()
 
 void updateSpeed(int s)
 {
-  lastSpeed = speed;
-  speed = s;
+        lastSpeed = speed;
+        speed = s;
 }
 //SPARKLER: a brush seeding sparkles
 void sparklerRead()
@@ -527,10 +647,12 @@ void sparklerRead()
         if (initialized == false)
         {
                 initialized = true;
-                if(speed > 0)
-                  pixelbrush.setSpeed(600);
-                else
-                  pixelbrush.setSpeed(-600);
+                updateSpeed(roll*30);
+                pixelbrush.setSpeed(speed);
+                // if(speed > 0)
+                //   pixelbrush.setSpeed(600);
+                // else
+                //   pixelbrush.setSpeed(-600);
                 pixelbrush.setFadeout(true);   //sparkles fade in
                 pixelbrush.setFadein(true);   //and fade out immediately after reaching the set brightness
         }
@@ -555,7 +677,7 @@ void sparklerRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
-                Serial.print("\saturation: ");
+                Serial.print("\nsaturation: ");
                 Serial.print(saturation);
                 Serial.print("\n");
         }
@@ -1143,15 +1265,15 @@ void initI2C_custom()
         Serial.print(F("here3"));
 }
 
-void readRoll()
+void readMpu()
 {
         // get current FIFO count
         fifoCount = mpu.getFIFOCount();
 
         // wait for correct available data length, should be a VERY short wait
-        //Serial.print(F("in readRoll if first"));
+        //Serial.print(F("in readMpu if first"));
         while (fifoCount < packetSize && mpuIntStatus < 1) fifoCount = mpu.getFIFOCount();
-        //Serial.print(F("after readRoll() while "));
+        //Serial.print(F("after readMpu() while "));
 
         // read a packet from FIFO
         mpu.getFIFOBytes(fifoBuffer, packetSize);
