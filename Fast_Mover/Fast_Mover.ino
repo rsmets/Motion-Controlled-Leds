@@ -40,7 +40,7 @@ FastLEDPainterBrush pixelbrush = FastLEDPainterBrush(&pixelcanvas); //crete brus
 /*
  * I2C members, constants and headers
  */
- #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
+#define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 
 #include "I2Cdev.h"
@@ -69,6 +69,9 @@ const uint8_t ADDRESS_ANIMATION_NUM = 0;
 const uint8_t ANIMATION_COUNT = 3;
 
 bool blinkState = false;
+uint8_t YAW = 2;
+uint8_t ROLL = 1;
+uint8_t speed_controller = ROLL;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -112,13 +115,13 @@ void setup() {
         LEDS.addLeds<LED_TYPE, LED_DT, LED_CK, COLOR_ORDER>(leds, NUM_LEDS); // Use this for WS2801 or APA102
 
         //setupI2C();
+        initI2C();
+        readMpu();
         setupLedAnimations();
         randomShow = random(10);
         Serial.print("random number is:");
         Serial.print(randomShow);
         Serial.print("\n");
-
-        batteryCheck();
 
         animationNumber = EEPROM.read(ADDRESS_ANIMATION_NUM);
         Serial.print("ANIMATION EEPROM :");
@@ -128,6 +131,9 @@ void setup() {
         if(!YAW_ANIMATION_CONTROL)
                 saveAnimationNum((animationNumber + 1) % ANIMATION_COUNT);
 
+        if(DEBUG_OUTPUT)
+          delay(200); //delay so serial interface on teensy can be created (it's a virtual interface)
+        batteryCheckAndChooseControls();
 }
 
 void blink(float voltage) {
@@ -169,13 +175,49 @@ void blink(float voltage) {
         }
 }
 
-void batteryCheck() {
+void batteryCheckAndChooseControls() {
         int sensorValue = analogRead(A0); //read the A0 pin value
         float voltage = sensorValue * (5.00 / 1600.00) * 2; //convert the value to a true voltage.
-        blink(voltage);
         Serial.print("voltage = ");
-        Serial.print(voltage); //print the voltage to LCD
-        Serial.print(" V");
+        Serial.print(voltage);
+        Serial.println(" V");
+
+        // Part 1 take initial readings
+        readMpu(); //throw out first one.
+        readMpu();
+        float yaw = ypr[0] * 180/M_PI;
+        float pitch = ypr[1] * 180/M_PI;
+        float roll = ypr[2] * 180/M_PI;
+
+        blink(voltage); //blinks indicating approximate battery level
+
+        // Part 2 take final readings
+        readMpu();
+        float yaw_later = ypr[0] * 180/M_PI;
+        float pitch_later = ypr[1] * 180/M_PI;
+        float roll_later = ypr[2] * 180/M_PI;
+
+        // the one with the biggest difference is now the main speed controller
+        float y_diff = abs(yaw - yaw_later);
+        float r_diff = abs(roll - roll_later);
+
+        if(DEBUG_OUTPUT) {
+          Serial.print("yaw diff: ");
+          Serial.print(y_diff);
+          Serial.print("   roll diff: ");
+          Serial.println(r_diff);
+        }
+        if(y_diff > r_diff)
+                speed_controller = YAW;
+        else
+                speed_controller = ROLL;
+
+        if(DEBUG_OUTPUT) {
+                if(speed_controller == ROLL)
+                        Serial.println("speed_controller: ROLL");
+                else if(speed_controller == YAW)
+                        Serial.println("speed_controller: YAW");
+        }
 }
 
 // ================================================================
@@ -400,31 +442,7 @@ void doLeds()
 }
 
 void saveAnimationNum(int number) {
-
         EEPROM.write(ADDRESS_ANIMATION_NUM, number);
-
-        // /***
-        //   Advance to the next address, when at the end restart at the beginning.
-        //
-        //   Larger AVR processors have larger EEPROM sizes, E.g:
-        //   - Arduno Duemilanove: 512b EEPROM storage.
-        //   - Arduino Uno:        1kb EEPROM storage.
-        //   - Arduino Mega:       4kb EEPROM storage.
-        //
-        //   Rather than hard-coding the length, you should use the pre-provided length function.
-        //   This will make your code portable to all AVR processors.
-        // ***/
-        // addr = addr + 1;
-        // if (addr == EEPROM.length()) {
-        //   addr = 0;
-        // }
-        //
-        // /***
-        //   As the EEPROM sizes are powers of two, wrapping (preventing overflow) of an
-        //   EEPROM address is also doable by a bitwise and of the length - 1.
-        //
-        //   ++addr &= EEPROM.length() - 1;
-        // ***/
 }
 
 void dripRead()
@@ -444,7 +462,7 @@ void dripRead()
         float pitch = ypr[1] * 180/M_PI;
         float roll = ypr[2] * 180/M_PI;
 
-        updateSpeed(roll*20);
+        updateSpeed(20);
 
         if(speed > 0 && lastSpeed < 0 ||
            speed < 0 && lastSpeed > 0) {
@@ -467,6 +485,10 @@ void dripRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
+                if(speed_controller == ROLL)
+                        Serial.println(" speed_controller: ROLL");
+                else if(speed_controller == YAW)
+                        Serial.println(" speed_controller: YAW");
                 Serial.print("\nbrightness: ");
                 Serial.print(brightness);
                 Serial.print("\n");
@@ -562,7 +584,7 @@ void rainbowPaintRead()
         float pitch = ypr[1] * 180/M_PI;
         float roll = ypr[2] * 180/M_PI;
 
-        updateSpeed(roll*20);
+        updateSpeed(20);
         pixelbrush.setSpeed(speed); //brush moving speed
 
         hue++;
@@ -582,6 +604,10 @@ void rainbowPaintRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
+                if(speed_controller == ROLL)
+                        Serial.println(" speed_controller: ROLL");
+                else if(speed_controller == YAW)
+                        Serial.println(" speed_controller: YAW");
                 Serial.print("\nbrightness: ");
                 Serial.print(brightness);
                 Serial.print("\n");
@@ -629,10 +655,20 @@ void rainbowPaint()
         }
 }
 
-void updateSpeed(int s)
+void updateSpeed(int multiplier)
 {
+  float yaw = ypr[0] * 180/M_PI;
+  float pitch = ypr[1] * 180/M_PI;
+  float roll = ypr[2] * 180/M_PI;
+
+    if(speed_controller == ROLL){
         lastSpeed = speed;
-        speed = s;
+        speed = roll * multiplier;
+      }
+    else {
+      lastSpeed = speed;
+      speed = yaw * multiplier;
+    }
 }
 //SPARKLER: a brush seeding sparkles
 void sparklerRead()
@@ -647,7 +683,7 @@ void sparklerRead()
         if (initialized == false)
         {
                 initialized = true;
-                updateSpeed(roll*30);
+                updateSpeed(30);
                 pixelbrush.setSpeed(speed);
                 // if(speed > 0)
                 //   pixelbrush.setSpeed(600);
@@ -677,6 +713,10 @@ void sparklerRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
+                if(speed_controller == ROLL)
+                        Serial.println(" speed_controller: ROLL");
+                else if(speed_controller == YAW)
+                        Serial.println(" speed_controller: YAW");
                 Serial.print("\nsaturation: ");
                 Serial.print(saturation);
                 Serial.print("\n");
