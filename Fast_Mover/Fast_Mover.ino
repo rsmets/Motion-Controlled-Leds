@@ -26,7 +26,7 @@ const int duration = 4000; //number of loops to run each animation for
 #define LED_CK 5
 #define COLOR_ORDER BGR                                       // Are they RGB, GRB or what??
 #define LED_TYPE APA102                                       // Don't forget to change LEDS.addLeds
-#define NUM_LEDS 144                                           // Number of LED's.
+#define NUM_LEDS 144                                          // Number of LED's.
 
 // Initialize changeable global variables.
 uint8_t max_bright = 128;                                     // Overall brightness definition. It can be changed on the fly.
@@ -71,7 +71,9 @@ const uint8_t ANIMATION_COUNT = 3;
 bool blinkState = false;
 uint8_t YAW = 2;
 uint8_t ROLL = 1;
-uint8_t speed_controller = ROLL;
+uint8_t speedController = ROLL;
+uint8_t secondaryController = YAW;
+bool dynamiclyAssignMotionControls = false;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -123,6 +125,7 @@ void setup() {
         Serial.print(randomShow);
         Serial.print("\n");
 
+        // reading EEPROM persisted animation number
         animationNumber = EEPROM.read(ADDRESS_ANIMATION_NUM);
         Serial.print("ANIMATION EEPROM :");
         Serial.print(animationNumber);
@@ -132,8 +135,12 @@ void setup() {
                 saveAnimationNum((animationNumber + 1) % ANIMATION_COUNT);
 
         if(DEBUG_OUTPUT)
-          delay(200); //delay so serial interface on teensy can be created (it's a virtual interface)
-        batteryCheckAndChooseControls();
+                delay(200); //delay so serial interface on teensy can be created (it's a virtual interface)
+
+        if(dynamiclyAssignMotionControls)
+                initDynamicControlsDuringBatteryCheck();
+        else
+                batteryCheck();
 }
 
 void blink(float voltage) {
@@ -175,13 +182,26 @@ void blink(float voltage) {
         }
 }
 
-void batteryCheckAndChooseControls() {
+void batteryCheck() {
         int sensorValue = analogRead(A0); //read the A0 pin value
         float voltage = sensorValue * (5.00 / 1600.00) * 2; //convert the value to a true voltage.
         Serial.print("voltage = ");
         Serial.print(voltage);
         Serial.println(" V");
 
+        blink(voltage); //blinks indicating approximate battery level
+}
+
+// Allows one to orient the stave in position one would like to have as primary speed controller
+// during the battery check led animation.
+void initDynamicControlsDuringBatteryCheck() {
+
+        int sensorValue = analogRead(A0); //read the A0 pin value
+        float voltage = sensorValue * (5.00 / 1600.00) * 2; //convert the value to a true voltage.
+        Serial.print("voltage = ");
+        Serial.print(voltage);
+        Serial.println(" V");
+        
         // Part 1 take initial readings
         readMpu(); //throw out first one.
         readMpu();
@@ -191,7 +211,7 @@ void batteryCheckAndChooseControls() {
 
         blink(voltage); //blinks indicating approximate battery level
 
-        // Part 2 take final readings
+        // Part 2 take final readings post battery animation
         readMpu();
         float yaw_later = ypr[0] * 180/M_PI;
         float pitch_later = ypr[1] * 180/M_PI;
@@ -202,21 +222,21 @@ void batteryCheckAndChooseControls() {
         float r_diff = abs(roll - roll_later);
 
         if(DEBUG_OUTPUT) {
-          Serial.print("yaw diff: ");
-          Serial.print(y_diff);
-          Serial.print("   roll diff: ");
-          Serial.println(r_diff);
+                Serial.print("yaw diff: ");
+                Serial.print(y_diff);
+                Serial.print("   roll diff: ");
+                Serial.println(r_diff);
         }
         if(y_diff > r_diff)
-                speed_controller = YAW;
+                speedController = YAW;
         else
-                speed_controller = ROLL;
+                speedController = ROLL;
 
         if(DEBUG_OUTPUT) {
-                if(speed_controller == ROLL)
-                        Serial.println("speed_controller: ROLL");
-                else if(speed_controller == YAW)
-                        Serial.println("speed_controller: YAW");
+                if(speedController == ROLL)
+                        Serial.println("speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println("speedController: YAW");
         }
 }
 
@@ -472,7 +492,9 @@ void dripRead()
         pixelbrush.setSpeed(speed); //brush moving speed
 
         brushcolor.s = 255; //full saturation
-        int brightness = 255 - abs(pitch) * 2.8;
+
+        int brightness = 255 - abs(yaw) * 2.8; //TODO configure the brightness according the secondaryController global var
+
         brushcolor.v = brightness; //random (peak) brighness
 
         pixelbrush.setColor(brushcolor); //set new color to the bursh
@@ -485,10 +507,10 @@ void dripRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
-                if(speed_controller == ROLL)
-                        Serial.println(" speed_controller: ROLL");
-                else if(speed_controller == YAW)
-                        Serial.println(" speed_controller: YAW");
+                if(speedController == ROLL)
+                        Serial.println(" speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println(" speedController: YAW");
                 Serial.print("\nbrightness: ");
                 Serial.print(brightness);
                 Serial.print("\n");
@@ -590,7 +612,7 @@ void rainbowPaintRead()
         hue++;
         brushcolor.h = hue / 3; //divide by 3 to slow down color fading
         brushcolor.s = 255; //full saturation
-        int brightness = 255 - abs(pitch) * 2.8;
+        int brightness = 255 - abs(yaw) * 2.8; //TODO configure the brightness according the secondaryController global var
         brushcolor.v = brightness; //random (peak) brighness
         //brushcolor.v = 255; //full brightness
 
@@ -604,10 +626,10 @@ void rainbowPaintRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
-                if(speed_controller == ROLL)
-                        Serial.println(" speed_controller: ROLL");
-                else if(speed_controller == YAW)
-                        Serial.println(" speed_controller: YAW");
+                if(speedController == ROLL)
+                        Serial.println(" speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println(" speedController: YAW");
                 Serial.print("\nbrightness: ");
                 Serial.print(brightness);
                 Serial.print("\n");
@@ -657,18 +679,18 @@ void rainbowPaint()
 
 void updateSpeed(int multiplier)
 {
-  float yaw = ypr[0] * 180/M_PI;
-  float pitch = ypr[1] * 180/M_PI;
-  float roll = ypr[2] * 180/M_PI;
+        float yaw = ypr[0] * 180/M_PI;
+        float pitch = ypr[1] * 180/M_PI;
+        float roll = ypr[2] * 180/M_PI;
 
-    if(speed_controller == ROLL){
-        lastSpeed = speed;
-        speed = roll * multiplier;
-      }
-    else {
-      lastSpeed = speed;
-      speed = yaw * multiplier;
-    }
+        if(speedController == ROLL) {
+                lastSpeed = speed;
+                speed = roll * multiplier;
+        }
+        else {
+                lastSpeed = speed;
+                speed = yaw * multiplier;
+        }
 }
 //SPARKLER: a brush seeding sparkles
 void sparklerRead()
@@ -695,7 +717,7 @@ void sparklerRead()
 
 
 
-        int saturation = 255 - abs(pitch) * 2.8;
+        int saturation = 255 - abs(yaw) * 2.8;
 
         //set a new brush color in each loop
         brushcolor.h = random(255);   //random color
@@ -713,10 +735,10 @@ void sparklerRead()
         if (DEBUG_OUTPUT) {
                 Serial.print("speed: ");
                 Serial.print(speed);
-                if(speed_controller == ROLL)
-                        Serial.println(" speed_controller: ROLL");
-                else if(speed_controller == YAW)
-                        Serial.println(" speed_controller: YAW");
+                if(speedController == ROLL)
+                        Serial.println(" speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println(" speedController: YAW");
                 Serial.print("\nsaturation: ");
                 Serial.print(saturation);
                 Serial.print("\n");
