@@ -14,9 +14,6 @@
  */
 const int duration = 4000; //number of loops to run each animation for
 
-#define NUMBEROFPIXELS 144 //Number of LEDs on the strip
-#define PIXELPIN 6 //Pin where WS281X pixels are connected
-
 #if FASTLED_VERSION < 3001000
 #error "Requires FastLED 3.1 or later; check github for latest code."
 #endif
@@ -26,7 +23,7 @@ const int duration = 4000; //number of loops to run each animation for
 #define LED_CK 5
 #define COLOR_ORDER BGR                                       // Are they RGB, GRB or what??
 #define LED_TYPE APA102                                       // Don't forget to change LEDS.addLeds
-#define NUM_LEDS 144                                          // Number of LED's.
+#define NUM_LEDS 60 //Number of LEDs on the strip
 
 // Initialize changeable global variables.
 uint8_t max_bright = 128;                                     // Overall brightness definition. It can be changed on the fly.
@@ -34,7 +31,7 @@ uint8_t max_bright = 128;                                     // Overall brightn
 struct CRGB leds[NUM_LEDS];
 
 //create one canvas and one brush with global scope
-FastLEDPainterCanvas pixelcanvas = FastLEDPainterCanvas(NUMBEROFPIXELS); //create canvas, linked to the FastLED library (canvas must be created before the brush)
+FastLEDPainterCanvas pixelcanvas = FastLEDPainterCanvas(NUM_LEDS); //create canvas, linked to the FastLED library (canvas must be created before the brush)
 FastLEDPainterBrush pixelbrush = FastLEDPainterBrush(&pixelcanvas); //crete brush, linked to the canvas to paint to
 
 /*
@@ -201,7 +198,7 @@ void initDynamicControlsDuringBatteryCheck() {
         Serial.print("voltage = ");
         Serial.print(voltage);
         Serial.println(" V");
-        
+
         // Part 1 take initial readings
         readMpu(); //throw out first one.
         readMpu();
@@ -809,12 +806,12 @@ void twinkleStars()
                         brushcolor.s = random(40); //set low saturation, almost white
                         brushcolor.v = random(200) + 20; //set random brightness
                         pixelbrush.setColor(brushcolor);
-                        pixelbrush.moveTo(random(NUMBEROFPIXELS)); //move the brush to a new, random pixel
+                        pixelbrush.moveTo(random(NUM_LEDS)); //move the brush to a new, random pixel
                         pixelbrush.setFadeSpeed(random(10) + 5); //set random fade speed, minimum of 5
                 }
 
                 //add a background color by setting all pixels to a color (instead of clearing all pixels):
-                fill_solid(leds, NUMBEROFPIXELS, CRGB(1, 0, 6)); //color in RGB: dark blue
+                fill_solid(leds, NUM_LEDS, CRGB(1, 0, 6)); //color in RGB: dark blue
 
 
                 pixelbrush.paint(); //paint the brush to the canvas
@@ -867,7 +864,7 @@ void chaser()
                                 brushcolor.v = 0; //zero intensity = black
                                 pixelbrush2.setSpeed(300); //moving speed was 900 but too fast for teensy
                                 pixelbrush2.setColor(brushcolor);
-                                pixelbrush2.moveTo(2*NUMBEROFPIXELS/3); //move the brush
+                                pixelbrush2.moveTo(2*NUM_LEDS/3); //move the brush
 
                         }
 
@@ -1001,7 +998,7 @@ void speedTrails()
                                 pixelbrush2.setFadeSpeed(220);
                                 pixelbrush2.setFadeout(true);
                                 pixelbrush2.setColor(brushcolor);
-                                pixelbrush2.moveTo(NUMBEROFPIXELS / 3); //move it up one third of the strip
+                                pixelbrush2.moveTo(NUM_LEDS / 3); //move it up one third of the strip
 
                                 //third brush
                                 brushcolor.h = 28; //yellow
@@ -1011,7 +1008,7 @@ void speedTrails()
                                 pixelbrush3.setFadeSpeed(190);
                                 pixelbrush3.setFadeout(true);
                                 pixelbrush3.setColor(brushcolor);
-                                pixelbrush3.moveTo(2 * NUMBEROFPIXELS / 3); //move it up two thirds of the strip
+                                pixelbrush3.moveTo(2 * NUM_LEDS / 3); //move it up two thirds of the strip
                         }
 
                         FastLED.clear();
@@ -1068,7 +1065,7 @@ void bouncyBalls()
                                 pixelbrush.setFadeSpeed(150);
                                 pixelbrush.setFadeout(true);
                                 pixelbrush.setColor(brushcolor);
-                                pixelbrush.moveTo(NUMBEROFPIXELS - 1); //move to end of the strip
+                                pixelbrush.moveTo(NUM_LEDS - 1); //move to end of the strip
                                 pixelbrush.setBounce(true); //bounce if either end of the strip is reached
 
                                 //second brush
@@ -1077,7 +1074,7 @@ void bouncyBalls()
                                 pixelbrush2.setFadeSpeed(190);
                                 pixelbrush2.setFadeout(true);
                                 pixelbrush2.setColor(brushcolor);
-                                pixelbrush2.moveTo(NUMBEROFPIXELS / 3); //move to one third of the strip
+                                pixelbrush2.moveTo(NUM_LEDS / 3); //move to one third of the strip
                                 pixelbrush2.setBounce(true);
 
                                 brushcolor.h = 70; //green-ish (pure green is 85 or 255/3)
@@ -1085,7 +1082,7 @@ void bouncyBalls()
                                 pixelbrush3.setFadeSpeed(220);
                                 pixelbrush3.setFadeout(true);
                                 pixelbrush3.setColor(brushcolor);
-                                pixelbrush3.moveTo(2 * NUMBEROFPIXELS / 3);
+                                pixelbrush3.moveTo(2 * NUM_LEDS / 3);
                                 pixelbrush3.setBounce(true);
                         }
 
@@ -1124,7 +1121,7 @@ void twoBrushColorMixing()
         {
 
                 //create an additional canvas for the second brush (needs to be created before the brush)
-                FastLEDPainterCanvas pixelcanvas2 = FastLEDPainterCanvas(NUMBEROFPIXELS);
+                FastLEDPainterCanvas pixelcanvas2 = FastLEDPainterCanvas(NUM_LEDS);
 
                 //create additional brush, painting on the second canvas
                 FastLEDPainterBrush pixelbrush2 = FastLEDPainterBrush(&pixelcanvas2);
@@ -1159,7 +1156,7 @@ void twoBrushColorMixing()
                                 pixelbrush.setFadeout(true);
                                 pixelbrush.setFadein(true);
                                 pixelbrush.setColor(brushcolor);
-                                pixelbrush.moveTo(random(NUMBEROFPIXELS));
+                                pixelbrush.moveTo(random(NUM_LEDS));
                                 pixelbrush.setBounce(true);
 
                                 //setup the second brush
@@ -1170,7 +1167,7 @@ void twoBrushColorMixing()
                                 pixelbrush2.setFadeout(true);
                                 pixelbrush2.setFadein(true);
                                 pixelbrush2.setColor(brushcolor);
-                                pixelbrush2.moveTo(random(NUMBEROFPIXELS));
+                                pixelbrush2.moveTo(random(NUM_LEDS));
                                 pixelbrush2.setBounce(true);
                         }
 
