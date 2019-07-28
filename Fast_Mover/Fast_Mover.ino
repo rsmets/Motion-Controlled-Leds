@@ -10,7 +10,7 @@
  */
 
 /*
- * NeoPixel animation members, constants, headers
+ * LED animation members, constants, headers
  */
 const int duration = 4000; //number of loops to run each animation for
 
@@ -19,11 +19,11 @@ const int duration = 4000; //number of loops to run each animation for
 #endif
 
 // Fixed definitions cannot change on the fly.
-#define LED_DT 4                                             // Data pin to connect to the strip.
-#define LED_CK 5
+#define LED_DT 4                                             // Data pin to connect to the strip. For APA strips this generally the GREEN wire.
+#define LED_CK 5                                             // For APA strips this generally the YELLOW wire.
 #define COLOR_ORDER BGR                                       // Are they RGB, GRB or what??
 #define LED_TYPE APA102                                       // Don't forget to change LEDS.addLeds
-#define NUM_LEDS 60 //Number of LEDs on the strip
+#define NUM_LEDS 144 //Number of LEDs on the strip
 
 // Initialize changeable global variables.
 uint8_t max_bright = 128;                                     // Overall brightness definition. It can be changed on the fly.
