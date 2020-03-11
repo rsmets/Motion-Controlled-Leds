@@ -22,7 +22,7 @@ void loop() {
   float ax, ay, az;
   float gx, gy, gz;
   float mx, my, mz;
-  float roll, pitch, heading;
+  float roll, pitch, yaw;
 
   if (imu.available()) {
     // Read the motion sensors
@@ -34,9 +34,9 @@ void loop() {
     // print the heading, pitch and roll
     roll = filter.getRoll();
     pitch = filter.getPitch();
-    heading = filter.getYaw();
-    Serial.print("Orientation: ");
-    Serial.print(heading);
+    yaw = filter.getYaw();
+    Serial.print("Orientation [ypr]: ");
+    Serial.print(yaw);
     Serial.print(" ");
     Serial.print(pitch);
     Serial.print(" ");
