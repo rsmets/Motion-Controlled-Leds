@@ -1,173 +1,3 @@
-#include "Arduino.h"
-#include <FastLED.h>
-#include <FastLEDPainter.h>
-#include <EEPROM.h>
-#include <CircularBuffer.h>
-
-/*
- * Utilizing FastLED painter libary and some animations from Damian Schneider.
- */
-
-/*
- * LED animation members, constants, headers
- */
-const int duration = 1000; //number of loops to run each animation for
-
-#if FASTLED_VERSION < 3001000
-#error "Requires FastLED 3.1 or later; check github for latest code."
-#endif
-
-// Fixed definitions cannot change on the fly.
-#define LED_DT 4                                             // Data pin to connect to the strip. For APA strips this generally the GREEN wire.
-#define LED_CK 5                                             // For APA strips this generally the YELLOW wire.
-#define COLOR_ORDER BGR                                      // Are they RGB, GRB or what??
-#define LED_TYPE APA102                                      // Don't forget to change LEDS.addLeds
-#define NUM_LEDS 144                                         //Number of LEDs on the strip
-
-// Initialize changeable global variables.
-uint8_t max_bright = 128;                                     // Overall brightness definition. It can be changed on the fly.
-
-struct CRGB leds[NUM_LEDS];
-
-//create one canvas and one brush with global scope
-FastLEDPainterCanvas pixelcanvas = FastLEDPainterCanvas(NUM_LEDS); //create canvas, linked to the FastLED library (canvas must be created before the brush)
-FastLEDPainterBrush pixelbrush = FastLEDPainterBrush(&pixelcanvas); //crete brush, linked to the canvas to paint to
-
-// FOR BOUNCY BALLS ANIMATION
-//create additional brushes, painting on the same canvas as the globally defined brush 
-FastLEDPainterBrush pixelbrushBB2 = FastLEDPainterBrush(&pixelcanvas); //crete brush, linked to the canvas to paint to
-FastLEDPainterBrush pixelbrushBB3 = FastLEDPainterBrush(&pixelcanvas); //crete brush, linked to the canvas to paint to
-
-/*
- * I2C members, constants and headers
- */
-#define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards
-#define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
-
-
-#include <NXPMotionSense.h>
-NXPMotionSense imu;
-NXPSensorFusion filter;
-
-
-#include "I2Cdev.h"
-#include "MPU6050_6Axis_MotionApps20.h"
-//#include "MPU6050.h" // not necessary if using MotionApps include file
-
-// Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
-// is used in I2Cdev.h
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-    #include "Wire.h"
-#endif
-
-// default I2C address is 0x68
-MPU6050 mpu;
-
-// uncomment "OUTPUT_READABLE_YAWPITCHROLL" if you want to see the yaw/
-// pitch/roll angles (in degrees) calculated from the quaternions coming
-// from the FIFO. Note this also requires gravity vector calculations.
-// Also note that yaw/pitch/roll angles suffer from gimbal lock (for
-// more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
-#define OUTPUT_READABLE_YAWPITCHROLL
-const bool DEBUG_OUTPUT = true;
-const bool YAW_ANIMATION_CONTROL = false;
-const uint8_t DIAL_SENSITIVITY = 35;
-const uint8_t ADDRESS_ANIMATION_NUM = 0;
-const uint8_t ANIMATION_COUNT = 3;
-
-bool blinkState = false;
-uint8_t YAW = 2;
-uint8_t ROLL = 1;
-uint8_t speedController = ROLL;
-uint8_t secondaryController = YAW;
-bool dynamiclyAssignMotionControls = false;
-
-// MPU control/status vars
-bool dmpReady = false;  // set true if DMP init was successful
-uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
-uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
-uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
-uint16_t fifoCount;     // count of all bytes currently in FIFO
-uint8_t fifoBuffer[64]; // FIFO storage buffer
-
-// orientation/motion vars
-Quaternion qc;           // [w, x, y, z]         quaternion container
-VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
-VectorFloat gravity;    // [x, y, z]            gravity vector
-float euler[3];         // [psi, theta, phi]    Euler angle container
-float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-// CircularBuffer<int, 100> rollHistory;
-unsigned long time = 0;
-float roll_rate = 0.0;  // roll rate
-float old_roll_rate = 0.0;  // roll rate
-const float ROLL_THRESHOLD = 15.0;
-bool spinning_animation = false;
-
-uint8_t randomShow;
-uint8_t animationNumber;
-uint16_t programNotch;
-static signed int speed = 1;
-static signed int lastSpeed = speed;
-byte eprom;
-
-//static unsigned int hue = 0; //color hue to set to brush
-CHSV brushcolor; //HSV color definition
-
-// ================================================================
-// ===               INTERRUPT DETECTION ROUTINE                ===
-// ================================================================
-
-volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
-void dmpDataReady() {
-        mpuInterrupt = true;
-}
-
-
-void setup() {
-        delay(1000);      // sanity check delay
-
-        // put your setup code here, to run once:
-        // LEDS.addLeds<LED_TYPE, LED_DT, LED_CK, COLOR_ORDER>(leds, NUM_LEDS); // Use this for WS2801 or APA102
-
-        FastLED.addLeds<LED_TYPE, COLOR_ORDER>(leds, NUM_LEDS);
-        pinMode(7, OUTPUT);
-        digitalWrite(7, HIGH);
-
-        //setupI2C();
-
-        // initI2C();
-        // readMpu();
-        time = millis();
-        
-        setupPropShield();
-        readPropShield();
-
-        setupLedAnimations();
-        randomShow = random(10);
-        Serial.print("random number is:");
-        Serial.print(randomShow);
-        Serial.print("\n");
-
-        // reading EEPROM persisted animation number
-        animationNumber = EEPROM.read(ADDRESS_ANIMATION_NUM);
-        Serial.print("ANIMATION EEPROM :");
-        Serial.print(animationNumber);
-        Serial.print("\n");
-
-        if(!YAW_ANIMATION_CONTROL)
-                saveAnimationNum((animationNumber + 1) % ANIMATION_COUNT);
-
-        if(DEBUG_OUTPUT)
-                delay(200); //delay so serial interface on teensy can be created (it's a virtual interface)
-
-        if(dynamiclyAssignMotionControls)
-                initDynamicControlsDuringBatteryCheck();
-        else
-                batteryCheck();
-}
-
 void blink(float voltage) {
         int blinkCount = 0;
         if(voltage > 4.2)
@@ -377,10 +207,9 @@ bool initialized = false; //initialize the canvas & brushes in each loop when ze
 
 void loop()
 {
-        //ledAnimationBundle();
+//ledAnimationBundle();
         //blink();
-        doUserInput(); // side steps the random show choice! FYI loops on itself
-
+        doUserInput();
         if( randomShow >7)
         {
                 doUserInput();
@@ -468,9 +297,9 @@ void doLeds()
         //sparkler();
         //twoBrushColorMixing();
         if(DEBUG_OUTPUT) {
-                // Serial.print("\nanimationNumber: ");
-                // Serial.print(animationNumber);
-                // Serial.print(" ");
+                Serial.print("\nanimationNumber: ");
+                Serial.print(animationNumber);
+                Serial.print(" ");
         }
 
         if (animationNumber % ANIMATION_COUNT ==  0) {
@@ -498,7 +327,7 @@ void saveAnimationNum(int number) {
 
 void dripRead()
 {
-        // Serial.print(F("in dripRead\n"));
+        Serial.print(F("in dripRead\n"));
 
         if (initialized == false) //initialize the brushes
         {
@@ -528,8 +357,7 @@ void dripRead()
 
         brushcolor.s = 255; //full saturation
 
-        // int brightness = 125 - abs(pitch) * 2.8; //TODO configure the brightness according the secondaryController global var
-        int brightness = int(abs(yaw)) % 120; //TODO configure the brightness according the secondaryController global var
+        int brightness = 255 - abs(pitch) * 2.8; //TODO configure the brightness according the secondaryController global var
 
         brushcolor.v = brightness; //random (peak) brighness
 
@@ -541,72 +369,18 @@ void dripRead()
         pixelcanvas.transfer(); //transfer (add) the canvas to the FastLED
 
         if (DEBUG_OUTPUT) {
-                printInfo(brightness);
-                // Serial.print("speed: ");
-                // Serial.print(speed);
-                // if(speedController == ROLL)
-                //         Serial.println(" speedController: ROLL");
-                // else if(speedController == YAW)
-                //         Serial.println(" speedController: YAW");
-                // Serial.print("\nbrightness: ");
-                // Serial.print(brightness);
-                // Serial.print("\n");
+                Serial.print("speed: ");
+                Serial.print(speed);
+                if(speedController == ROLL)
+                        Serial.println(" speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println(" speedController: YAW");
+                Serial.print("\nbrightness: ");
+                Serial.print(brightness);
+                Serial.print("\n");
         }
 
         FastLED.show();
-}
-
-void printInfo(int brightness) {
-        // char buf[10];
-        // sprintf(buf, "speed %d", speed)
-        // Serial.println(buf);
-
-        // Serial.print("speed: ");
-        // Serial.print(speed);
-        // Serial.print("   brightness: ");
-        // Serial.print(brightness);
-        // if(speedController == ROLL)
-        //         Serial.print("   speedController: ROLL");
-        // else if(speedController == YAW)
-        //         Serial.println("   speedController: YAW");
-
-        // float roll, pitch, yaw;
-        // roll = filter.getRoll();
-        // pitch = filter.getPitch();
-        // yaw = filter.getYaw();
-        // Serial.print(" yaw: ");
-        // Serial.print(yaw);
-        // Serial.print(" pitch: ");
-        // Serial.print(pitch);
-        // Serial.print(" roll: ");
-        // Serial.println(roll);
-        
-        // Serial.print("\n");
-}
-
-void printInfo2(int brightness) {
-
-        Serial.print("speed: ");
-        Serial.print(speed);
-        Serial.print("   brightness: ");
-        Serial.print(brightness);
-        if(speedController == ROLL)
-                Serial.print("   speedController: ROLL");
-        else if(speedController == YAW)
-                Serial.println("   speedController: YAW");
-
-        float roll, pitch, yaw;
-        roll = filter.getRoll();
-        pitch = filter.getPitch();
-        yaw = filter.getYaw();
-        Serial.print(" yaw: ");
-        Serial.print(yaw);
-        Serial.print(" pitch: ");
-        Serial.print(pitch);
-        Serial.print(" roll: ");
-        Serial.println(roll);
-        
-        Serial.print("\n");
 }
 
 void ledAnimationBundle()
@@ -656,7 +430,7 @@ void rainbowBlink()
                 hue++;
                 brushcolor.h = hue / 3; //divide by 3 to slow down color fading
                 brushcolor.s = 255; //full saturation
-                brushcolor.v = 125; //full brightness
+                brushcolor.v = 255; //full brightness
 
                 pixelbrush.setColor(brushcolor); //set new color to the bursh
 
@@ -675,7 +449,7 @@ void rainbowBlink()
 //---------------------
 void rainbowPaintRead()
 {
-        // Serial.println(F("in rainbow paint read"));
+        Serial.println(F("in rainbow paint read"));
         //the brush moves along the strip, leaving a colorful rainbow trail
         // for(loopcounter = 0; loopcounter<duration; loopcounter++)
         // {
@@ -706,10 +480,7 @@ void rainbowPaintRead()
         hue++;
         brushcolor.h = hue / 3; //divide by 3 to slow down color fading
         brushcolor.s = 255; //full saturation
-
-        // int brightness = 125 - abs(pitch) * 2.8; //TODO configure the brightness according the secondaryController global var
-        int brightness = int(abs(yaw)) % 120; //TODO configure the brightness according the secondaryController global var
-        
+        int brightness = 255 - abs(pitch) * 2.8; //TODO configure the brightness according the secondaryController global var
         brushcolor.v = brightness; //random (peak) brighness
         //brushcolor.v = 255; //full brightness
 
@@ -721,16 +492,15 @@ void rainbowPaintRead()
         pixelcanvas.transfer(); //transfer (add) the canvas to the FastLED
 
         if (DEBUG_OUTPUT) {
-                printInfo(brightness);
-                // Serial.print("speed: ");
-                // Serial.print(speed);
-                // if(speedController == ROLL)
-                //         Serial.println(" speedController: ROLL");
-                // else if(speedController == YAW)
-                //         Serial.println(" speedController: YAW");
-                // Serial.print("\nbrightness: ");
-                // Serial.print(brightness);
-                // Serial.print("\n");
+                Serial.print("speed: ");
+                Serial.print(speed);
+                if(speedController == ROLL)
+                        Serial.println(" speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println(" speedController: YAW");
+                Serial.print("\nbrightness: ");
+                Serial.print(brightness);
+                Serial.print("\n");
         }
 
         FastLED.show();
@@ -775,52 +545,6 @@ void rainbowPaint()
         }
 }
 
-void rainbowPaintWithInput()
-{
-        Serial.println(F("rainbow paint with input"));
-        //the brush moves along the strip, leaving a colorful rainbow trail
-        for(loopcounter = 0; loopcounter<duration; loopcounter++)
-        {
-                readPropShield(); // still want the averages to update
-
-                static unsigned int hue = 0; //color hue to set to brush
-                //CHSV brushcolor; //HSV color definition
-
-
-                if (initialized == false) //initialize the brushes
-                {
-                        initialized = true;
-                        pixelbrush.setSpeed(random(100) + 300); //brush moving speed
-                        pixelbrush.setFadeSpeed(90);
-                        pixelbrush.setFadein(false); //brightness will fade-in if set to true
-                        pixelbrush.setFadeout(true);
-                        pixelbrush.setBounce(false);
-                }
-
-                hue++;
-                brushcolor.h = hue / 3; //divide by 3 to slow down color fading
-                brushcolor.s = 255; //full saturation
-                // brushcolor.v = 255; //full brightness
-                brushcolor.v = 155; //full brightness
-
-                // float yaw = ypr[0];
-                // int brightness = (int(abs(yaw)) % 120) + 50;
-                // brushcolor.v = brightness; 
-                
-
-                pixelbrush.setColor(brushcolor); //set new color to the bursh
-
-                FastLED.clear();
-
-                pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
-                pixelcanvas.transfer(); //transfer (add) the canvas to the FastLED
-
-                FastLED.show();
-        }
-
-        spinning_animation = false;
-}
-
 void updateSpeed(int multiplier)
 {
         // float yaw = ypr[0] * 180/M_PI;
@@ -843,7 +567,7 @@ void updateSpeed(int multiplier)
 //SPARKLER: a brush seeding sparkles
 void sparklerRead()
 {
-        // Serial.print(F("in sparklerRead\n"));
+        Serial.print(F("in sparklerRead\n"));
 
         // float yaw = ypr[0] * 180/M_PI;
         // float pitch = ypr[1] * 180/M_PI;
@@ -874,8 +598,7 @@ void sparklerRead()
         //set a new brush color in each loop
         brushcolor.h = random(255);   //random color
         brushcolor.s = saturation;  //random(130); //random but low saturation, giving white-ish sparkles
-        int brightness = random(125);
-        brushcolor.v = brightness;                //random (peak) brighness
+        brushcolor.v = random(200);                //random (peak) brighness
 
         pixelbrush.setColor(brushcolor);
         pixelbrush.setFadeSpeed(random(100) + 150);   //set a new fadespeed with some randomness
@@ -886,16 +609,15 @@ void sparklerRead()
         pixelcanvas.transfer();   //transfer (add) the canvas to the FastLED
 
         if (DEBUG_OUTPUT) {
-                printInfo(brightness);
-                // Serial.print("speed: ");
-                // Serial.print(speed);
-                // if(speedController == ROLL)
-                //         Serial.println(" speedController: ROLL");
-                // else if(speedController == YAW)
-                //         Serial.println(" speedController: YAW");
-                // Serial.print("\nsaturation: ");
-                // Serial.print(saturation);
-                // Serial.print("\n");
+                Serial.print("speed: ");
+                Serial.print(speed);
+                if(speedController == ROLL)
+                        Serial.println(" speedController: ROLL");
+                else if(speedController == YAW)
+                        Serial.println(" speedController: YAW");
+                Serial.print("\nsaturation: ");
+                Serial.print(saturation);
+                Serial.print("\n");
         }
 
         FastLED.show();
@@ -1267,95 +989,6 @@ void bouncyBalls()
         }
 }
 
-void bouncyBallsWithInput()
-{
-        Serial.println(F("bouncy balls"));
-        // while(true) //create a loop with two additional brushes (are deleted automatically once the loop finishes)
-        // for(loopcounter = 0; loopcounter<duration; loopcounter++)
-        // {
-
-                // readPropShield(); // still want the averages to update
-
-                // //create additional brushes, painting on the same canvas as the globally defined brush
-                // FastLEDPainterBrush pixelbrush2 = FastLEDPainterBrush(&pixelcanvas); //crete brush, linked to the canvas to paint to
-                // FastLEDPainterBrush pixelbrush3 = FastLEDPainterBrush(&pixelcanvas); //crete brush, linked to the canvas to paint to
-
-                // if (pixelbrush2.isvalid() == false) Serial.println(F("brush2 allocation problem"));
-                // else Serial.println(F("brush2 allocation ok"));
-
-                // if (pixelbrush3.isvalid() == false) Serial.println(F("brush3 allocation problem"));
-                // else Serial.println(F("brush3 allocation ok"));
-
-                byte skipper = 0;
-
-                for(loopcounter = 0; loopcounter<duration; loopcounter++)
-                {
-
-                        readPropShield(); // still want the averages to update
-                        
-                        if (initialized == false) //initialize the brushes
-                        {
-                                initialized = true;
-
-                                //CHSV brushcolor;
-
-                                brushcolor.h = 20; //orange
-                                brushcolor.s = 240; //almost full saturation
-                                // brushcolor.v = 150; //medium brightness
-                                brushcolor.v = 110;
-
-                                //first brush
-                                pixelbrush.setSpeed(0); //zero initial speed
-                                pixelbrush.setFadeSpeed(150);
-                                pixelbrush.setFadeout(true);
-                                pixelbrush.setColor(brushcolor);
-                                pixelbrush.moveTo(NUM_LEDS - 1); //move to end of the strip
-                                pixelbrush.setBounce(true); //bounce if either end of the strip is reached
-
-                                //second brush
-                                brushcolor.h = 220; //pink
-                                pixelbrushBB2.setSpeed(0); //zero initial speed
-                                pixelbrushBB2.setFadeSpeed(190);
-                                pixelbrushBB2.setFadeout(true);
-                                pixelbrushBB2.setColor(brushcolor);
-                                pixelbrushBB2.moveTo(NUM_LEDS / 3); //move to one third of the strip
-                                pixelbrushBB2.setBounce(true);
-
-                                brushcolor.h = 70; //green-ish (pure green is 85 or 255/3)
-                                pixelbrushBB3.setSpeed(0);
-                                pixelbrushBB3.setFadeSpeed(220);
-                                pixelbrushBB3.setFadeout(true);
-                                pixelbrushBB3.setColor(brushcolor);
-                                pixelbrushBB3.moveTo(2 * NUM_LEDS / 3);
-                                pixelbrushBB3.setBounce(true);
-                        }
-
-                        //apply some gravity force that accelerates the painters (i.e. add speed in negative direction = towards zero pixel)
-                         if (skipper % 5 == 0) //only apply gravity at some interval to make it slower on fast processors
-                         {
-                        //read current speed of each brush and speed it up in negative direction (towards pixel zero)
-                        pixelbrush.setSpeed(pixelbrush.getSpeed() - 5);
-                        pixelbrushBB2.setSpeed(pixelbrushBB2.getSpeed() - 5);
-                        pixelbrushBB3.setSpeed(pixelbrushBB3.getSpeed() - 5);
-                         }
-                         skipper++;
-
-
-                        FastLED.clear();
-
-                        pixelbrush.paint(); //apply the paint of the first brush to the canvas (and update the brush)
-                        pixelbrushBB2.paint(); //apply the paint of the second brush to the canvas (and update the brush)
-                        pixelbrushBB3.paint(); //apply the paint of the third brush to the canvas (and update the brush)
-                        pixelcanvas.transfer(); //transfer the canvas to the FastLED (and update i.e. fade pixels)
-
-                        FastLED.show();
-                }
-                // break; //quit the while loop immediately (and delete the created brush)
-        // }
-        FastLED.clear();
-        spinning_animation = false;
-}
-
 //---------------------
 //TWO-BRUSH-COLORMIXING
 //---------------------
@@ -1597,46 +1230,12 @@ void readPropShield() {
     ypr[1] = roll; // pitch and roll seemed to be swapped between ic's
     ypr[2]= pitch;
 
-    // handle the roll rate calc
-//     rollHistory.push(pitch);
-        // if (millis() - time >= 250 && rollHistory.isFull()) {
-        if (millis() - time >= 250) {
-                time = millis();
-                // float avg = 0.0;
-                // float sum = 0;
-                // // the following ensures using the right type for the index variable
-                // using index_t = decltype(rollHistory)::index_t;
-                // for (index_t i = 0; i < rollHistory.size(); i++) {
-                //         // avg += buffer[i] / (float)buffer.size();
-                //         // roll_rate += rollHistory[i] / (float)rollHistory.size();
-                //         sum += rollHistory[i];
-                // }
-
-                printInfo2(brushcolor.v);
-
-                // roll_rate = sum / rollHistory.size();
-                // Serial.print("Average is ");
-                roll_rate = pitch;
-                Serial.print("RATE is ");
-                Serial.print(abs(old_roll_rate - roll_rate));
-                Serial.print(" spinning: ");
-                Serial.println(spinning_animation);
-
-                if (!spinning_animation && abs(old_roll_rate - roll_rate) > ROLL_THRESHOLD) {
-                        // should switch to standard animations
-                        spinning_animation = true;
-                        // rainbowPaintWithInput();
-                        bouncyBallsWithInput();
-                }
-                old_roll_rate = roll_rate;
-        }
-
-//     Serial.print("Orientation [ypr]: ");
-//     Serial.print(yaw);
-//     Serial.print(" ");
-//     Serial.print(pitch);
-//     Serial.print(" ");
-//     Serial.println(roll);
+    Serial.print("Orientation [ypr]: ");
+    Serial.print(yaw);
+    Serial.print(" ");
+    Serial.print(pitch);
+    Serial.print(" ");
+    Serial.println(roll);
   }
 }
 
