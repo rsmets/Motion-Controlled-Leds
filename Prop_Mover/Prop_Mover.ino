@@ -168,6 +168,7 @@ void setup() {
                 batteryCheck();
 }
 
+// Animation
 void blink(float voltage) {
         int blinkCount = 0;
         if(voltage > 4.2)
@@ -496,6 +497,7 @@ void saveAnimationNum(int number) {
         EEPROM.write(ADDRESS_ANIMATION_NUM, number);
 }
 
+// Animation
 void dripRead()
 {
         // Serial.print(F("in dripRead\n"));
@@ -673,6 +675,7 @@ void rainbowBlink()
 //---------------------
 //RAINBOW PAINT (aka nyan cat)
 //---------------------
+// Animation
 void rainbowPaintRead()
 {
         // Serial.println(F("in rainbow paint read"));
@@ -739,6 +742,7 @@ void rainbowPaintRead()
 //---------------------
 //RAINBOW PAINT (aka nyan cat)
 //---------------------
+// Animation
 void rainbowPaint()
 {
         Serial.println(F("rainbow paint"));
@@ -841,6 +845,7 @@ void updateSpeed(int multiplier)
         }
 }
 //SPARKLER: a brush seeding sparkles
+// Animation
 void sparklerRead()
 {
         // Serial.print(F("in sparklerRead\n"));
@@ -903,6 +908,7 @@ void sparklerRead()
 }
 
 //SPARKLER: a brush seeding sparkles
+// Animation
 void sparkler()
 {
         Serial.println(F("sparkler"));
@@ -939,6 +945,7 @@ void sparkler()
 //---------------------
 //TWINKLE STARS
 //---------------------
+// Animation
 void twinkleStars()
 {
         Serial.println(F("twinkler stars"));
@@ -981,6 +988,7 @@ void twinkleStars()
 //-------------
 //CHASER
 //-------------
+// Animation
 void chaser()
 {
         Serial.println(F("chaser"));
@@ -1040,6 +1048,7 @@ void chaser()
 //------------------------------
 //HUE FADER: demo of hue fading
 //------------------------------
+// Animation
 void hueDemo()
 {
         Serial.println(F("hue demo"));
@@ -1111,6 +1120,7 @@ void hueDemo()
 //SPEEDTRAILS
 //------------------------------
 //three brushes painting on one canvas, all following each other at the same speed, painting fading pixels
+// Animation
 void speedTrails()
 {
         Serial.println(F("speed trails"));
@@ -1185,6 +1195,7 @@ void speedTrails()
 //BOUNCY BALLS
 //-------------
 //three brushes painting on one canvas, attracted to the zero pixel as if by gravity
+// Animation
 void bouncyBalls()
 {
         Serial.println(F("bouncy balls"));
@@ -1360,6 +1371,7 @@ void bouncyBallsWithInput()
 //TWO-BRUSH-COLORMIXING
 //---------------------
 //two brushes moving around randomly paint on their individual canvas, resulting in colors being mixed
+// Animation
 void twoBrushColorMixing()
 {
         Serial.println(F("two brush mix"));
