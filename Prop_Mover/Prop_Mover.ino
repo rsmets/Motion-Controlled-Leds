@@ -73,7 +73,7 @@ const bool DEBUG_OUTPUT = true;
 const bool YAW_ANIMATION_CONTROL = false;
 const uint8_t DIAL_SENSITIVITY = 35;
 const uint8_t ADDRESS_ANIMATION_NUM = 0;
-const uint8_t ANIMATION_COUNT = 3;
+const uint8_t ANIMATION_COUNT = 4;
 
 bool blinkState = false;
 uint8_t YAW = 2;
@@ -481,19 +481,25 @@ void doLeds()
         // else if (animationNumber % ANIMATION_COUNT ==  1) {
         //         rainbowPaintRead();
         // }
+        // else if (animationNumber % ANIMATION_COUNT ==  2) {
+        //         sparklerFireRead(10, false);
+        // }
         // else {
         //         sparklerRead();
         // }
         
         // Static fire animations
         if (animationNumber % ANIMATION_COUNT ==  0) {
-                sparklerFireRead(10);
+                sparklerFireRead(10, false);
         }
         else if (animationNumber % ANIMATION_COUNT ==  1) {
-                sparklerFireRead(125);
+                sparklerFireRead(10, true);
+        }
+        else if (animationNumber % ANIMATION_COUNT ==  2) {
+                sparklerFireRead(125, false);
         }
         else {
-                sparklerFireRead(250);
+                sparklerFireRead(125, true);
         }
 
         if(DEBUG_OUTPUT && YAW_ANIMATION_CONTROL) {
@@ -904,7 +910,7 @@ void sparklerFireReadOg()
     FastLED.show(); // display this frame
 }
 
-void sparklerFireRead(uint8_t fireBrightness)
+void sparklerFireRead(uint8_t fireBrightness, bool reverse)
 {
 // Array of temperature readings at each simulation cell
   static byte heat[NUM_LEDS];
@@ -930,7 +936,11 @@ void sparklerFireRead(uint8_t fireBrightness)
       // Scale the heat value from 0-255 down to 0-240
       // for best results with color palettes.
       byte colorindex = scale8( heat[j], 240);
-      CRGB color = ColorFromPalette( CRGBPalette16( CRGB::Black, CRGB::Red, CRGB::Orange,  CRGB::White), colorindex, fireBrightness);
+      CRGB color = ColorFromPalette( CRGBPalette16( CRGB::Black, CRGB::Red, CRGB::Orange,  CRGB::BlueViolet), colorindex, fireBrightness);
+      if (reverse) {
+        color = ColorFromPalette( CRGBPalette16( CRGB::BlueViolet,  CRGB::Orange, CRGB::Red, CRGB::Black), colorindex, fireBrightness);
+      }
+
       int pixelnumber;
       if( gReverseDirection ) {
         pixelnumber = (NUM_LEDS-1) - j;
