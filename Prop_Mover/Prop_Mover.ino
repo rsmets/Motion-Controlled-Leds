@@ -475,32 +475,32 @@ void doLeds()
         }
 
         // Dynamic user input animations
-        // if (animationNumber % ANIMATION_COUNT ==  0) {
-        //         dripRead();
-        // }
-        // else if (animationNumber % ANIMATION_COUNT ==  1) {
-        //         rainbowPaintRead();
-        // }
-        // else if (animationNumber % ANIMATION_COUNT ==  2) {
-        //         sparklerFireRead(10, false);
-        // }
-        // else {
-        //         sparklerRead();
-        // }
-        
-        // Static fire animations
         if (animationNumber % ANIMATION_COUNT ==  0) {
-                sparklerFireRead(10, false);
+                dripRead();
         }
         else if (animationNumber % ANIMATION_COUNT ==  1) {
-                sparklerFireRead(10, true);
+                rainbowPaintRead();
         }
         else if (animationNumber % ANIMATION_COUNT ==  2) {
-                sparklerFireRead(125, false);
+                sparklerFireRead(10, false);
         }
         else {
-                sparklerFireRead(125, true);
+                sparklerRead();
         }
+        
+        // Static fire animations
+        // if (animationNumber % ANIMATION_COUNT ==  0) {
+        //         sparklerFireRead(10, false);
+        // }
+        // else if (animationNumber % ANIMATION_COUNT ==  1) {
+        //         sparklerFireRead(10, true);
+        // }
+        // else if (animationNumber % ANIMATION_COUNT ==  2) {
+        //         sparklerFireRead(125, false);
+        // }
+        // else {
+        //         sparklerFireRead(125, true);
+        // }
 
         if(DEBUG_OUTPUT && YAW_ANIMATION_CONTROL) {
                 Serial.print("next programNotch [ ");
