@@ -22,7 +22,7 @@ const int duration = 1000; //number of loops to run each animation for
 #define LED_CK 5                                             // For APA strips this generally the YELLOW wire.
 #define COLOR_ORDER BGR                                      // Are they RGB, GRB or what??
 #define LED_TYPE APA102                                      // Don't forget to change LEDS.addLeds
-#define NUM_LEDS 144                                         //Number of LEDs on the strip
+#define NUM_LEDS 288//144                                         //Number of LEDs on the strip
 
 // Initialize changeable global variables.
 uint8_t max_bright = 128;                                     // Overall brightness definition. It can be changed on the fly.
@@ -438,7 +438,7 @@ void doUserInput()
 
 void doLeds()
 {
-        initialized = false;
+        // initialized = false;
 
         // readMpu();
         readPropShield();
@@ -474,19 +474,20 @@ void doLeds()
                 // Serial.print(" ");
         }
 
-        // Dynamic user input animations
-        if (animationNumber % ANIMATION_COUNT ==  0) {
-                dripRead();
-        }
-        else if (animationNumber % ANIMATION_COUNT ==  1) {
-                rainbowPaintRead();
-        }
-        else if (animationNumber % ANIMATION_COUNT ==  2) {
-                sparklerFireRead(10, false);
-        }
-        else {
-                sparklerRead();
-        }
+        dripRead2(); // DO NOT COMMIT: testing just dripRead
+        // // Dynamic user input animations
+        // if (animationNumber % ANIMATION_COUNT ==  0) {
+        //         dripRead();
+        // }
+        // else if (animationNumber % ANIMATION_COUNT ==  1) {
+        //         rainbowPaintRead();
+        // }
+        // else if (animationNumber % ANIMATION_COUNT ==  2) {
+        //         sparklerFireRead(10, false);
+        // }
+        // else {
+        //         sparklerRead();
+        // }
         
         // Static fire animations
         // if (animationNumber % ANIMATION_COUNT ==  0) {
@@ -516,6 +517,81 @@ void saveAnimationNum(int number) {
 }
 
 // Animation
+void dripRead2()
+{
+        // Serial.print(F("in dripRead\n"));
+
+        if (initialized == false) //initialize the brushes
+        {
+                pixelbrush.setFadeSpeed(90);
+                pixelbrush.setFadein(false); //brightness will fade-in if set to true
+                pixelbrush.setFadeout(true);
+                pixelbrush.setBounce(false);
+                pixelbrush.moveTo(0);
+
+                // const curPos = pixelbrush.getPosition()
+
+                pixelbrushBB2.setFadeSpeed(90);
+                pixelbrushBB2.setFadein(false); //brightness will fade-in if set to true
+                pixelbrushBB2.setFadeout(true);
+                pixelbrushBB2.setBounce(false);
+                pixelbrushBB2.moveTo(144);
+
+                initialized = true;
+                Serial.print("DripRead2 init success");
+        }
+
+        // float yaw = ypr[0] * 180/M_PI;
+        // float pitch = ypr[1] * 180/M_PI;
+        // float roll = ypr[2] * 180/M_PI;
+
+        float yaw = ypr[0];
+        float pitch = ypr[1];
+        float roll = ypr[2];  
+
+        updateSpeed(2);
+
+        if(speed > 0 && lastSpeed < 0 ||
+           speed < 0 && lastSpeed > 0) {
+                brushcolor.h = random(255); //random color
+        }
+
+        pixelbrush.setSpeed(speed); //brush moving speed
+        pixelbrushBB2.setSpeed(speed);
+
+        brushcolor.s = 255; //full saturation
+
+        // int brightness = 125 - abs(pitch) * 2.8; //TODO configure the brightness according the secondaryController global var
+        int brightness = int(abs(yaw)) % 120; //TODO configure the brightness according the secondaryController global var
+
+        brushcolor.v = brightness; //random (peak) brighness
+
+        pixelbrush.setColor(brushcolor); //set new color to the brush
+        pixelbrushBB2.setColor(brushcolor); //set new color to the brush
+
+        FastLED.clear();
+
+        pixelbrush.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
+        pixelbrushBB2.paint(); //paint the brush to the canvas (and update the brush, i.e. move it a little)
+        
+        pixelcanvas.transfer(); //transfer (add) the canvas to the FastLED
+
+        if (DEBUG_OUTPUT) {
+                printInfo(brightness);
+                // Serial.print("speed: ");
+                // Serial.print(speed);
+                // if(speedController == ROLL)
+                //         Serial.println(" speedController: ROLL");
+                // else if(speedController == YAW)
+                //         Serial.println(" speedController: YAW");
+                // Serial.print("\nbrightness: ");
+                // Serial.print(brightness);
+                // Serial.print("\n");
+        }
+
+        FastLED.show();
+}
+
 void dripRead()
 {
         // Serial.print(F("in dripRead\n"));
@@ -537,7 +613,7 @@ void dripRead()
         float pitch = ypr[1];
         float roll = ypr[2];  
 
-        updateSpeed(5);
+        updateSpeed(2);
 
         if(speed > 0 && lastSpeed < 0 ||
            speed < 0 && lastSpeed > 0) {
@@ -721,7 +797,7 @@ void rainbowPaintRead()
         float pitch = ypr[1];
         float roll = ypr[2];  
 
-        updateSpeed(5);
+        updateSpeed(2);
         pixelbrush.setSpeed(speed); //brush moving speed
 
         hue++;
@@ -971,7 +1047,7 @@ void sparklerRead()
         if (initialized == false)
         {
                 initialized = true;
-                updateSpeed(5);
+                updateSpeed(2);
                 pixelbrush.setSpeed(speed);
                 // if(speed > 0)
                 //   pixelbrush.setSpeed(600);
