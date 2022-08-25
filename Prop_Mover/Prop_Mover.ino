@@ -571,15 +571,15 @@ void dripRead2()
         }
 
         pixelbrush.setSpeed(speed); // brush moving speed
-        pixelbrushBB2.setSpeed(speed);
+        pixelbrushBB2.setSpeed(-speed);
 
         int curPos = pixelbrush.getPosition();
         if (curPos == 144)
         { // means pixelbrushBB must be at post 287
                 pixelbrush.moveTo(0);
-                pixelbrush.setSpeed(-speed); // brush moving speed
-                pixelbrushBB2.moveTo(144);
-                pixelbrushBB2.setSpeed(-speed); // brush moving speed
+                // pixelbrush.setSpeed(-speed); // brush moving speed
+                pixelbrushBB2.moveTo(287);
+                // pixelbrushBB2.setSpeed(-speed); // brush moving speed
         }
 
         brushcolor.s = 255; // full saturation
