@@ -22,7 +22,7 @@ const int duration = 1000; // number of loops to run each animation for
 #define LED_CK 5        // For APA strips this generally the YELLOW wire.
 #define COLOR_ORDER BGR // Are they RGB, GRB or what??
 #define LED_TYPE APA102 // Don't forget to change LEDS.addLeds
-#define NUM_LEDS 288    // 144                                         //Number of LEDs on the strip
+#define NUM_LEDS 144    // Number of LEDs on the strip
 
 // Initialize changeable global variables.
 uint8_t max_bright = 128; // Overall brightness definition. It can be changed on the fly.
