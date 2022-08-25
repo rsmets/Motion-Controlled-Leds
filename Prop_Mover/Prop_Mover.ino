@@ -33,8 +33,8 @@ struct CRGB leds[NUM_LEDS];
 FastLEDPainterCanvas pixelcanvas = FastLEDPainterCanvas(NUM_LEDS);  // create canvas, linked to the FastLED library (canvas must be created before the brush)
 FastLEDPainterBrush pixelbrush = FastLEDPainterBrush(&pixelcanvas); // crete brush, linked to the canvas to paint to
 
-// create an additional "double" brush, painting on the same canvas as the globally defined brush which ought to mirror the original for use with 288 leds.
-FastLEDPainterBrush pixelbrushD = FastLEDPainterBrush(&pixelcanvas); // crete brush, linked to the canvas to paint to
+// create an additional "mirrored" brush, painting on the same canvas as the globally defined brush which ought to mirror the original for use with 288 leds in the dripReadMirror animation
+FastLEDPainterBrush pixelbrushM = FastLEDPainterBrush(&pixelcanvas); // crete brush, linked to the canvas to paint to
 
 // FOR BOUNCY BALLS ANIMATION
 // create additional brushes, painting on the same canvas as the globally defined brush
@@ -490,7 +490,7 @@ void doLeds()
                 // Serial.print(" ");
         }
 
-        dripRead2(); // DO NOT COMMIT: testing just dripRead
+        dripReadMirror(); // DO NOT COMMIT: testing just dripRead
         // // Dynamic user input animations
         // if (animationNumber % ANIMATION_COUNT ==  0) {
         //         dripRead();
@@ -535,7 +535,7 @@ void saveAnimationNum(int number)
 }
 
 // Animation
-void dripRead2()
+void dripReadMirror()
 {
         // Serial.print(F("in dripRead\n"));
 
@@ -547,14 +547,14 @@ void dripRead2()
                 pixelbrush.setBounce(false);
                 pixelbrush.moveTo(0);
 
-                pixelbrushD.setFadeSpeed(90);
-                pixelbrushD.setFadein(false); // brightness will fade-in if set to true
-                pixelbrushD.setFadeout(true);
-                pixelbrushD.setBounce(false);
-                pixelbrushD.moveTo(287);
+                pixelbrushM.setFadeSpeed(90);
+                pixelbrushM.setFadein(false); // brightness will fade-in if set to true
+                pixelbrushM.setFadeout(true);
+                pixelbrushM.setBounce(false);
+                pixelbrushM.moveTo(287);
 
                 initialized = true;
-                Serial.print("DripRead2 init success");
+                Serial.print("dripReadMirror init success");
         }
 
         // float yaw = ypr[0] * 180/M_PI;
@@ -574,15 +574,15 @@ void dripRead2()
         }
 
         pixelbrush.setSpeed(speed); // brush moving speed
-        pixelbrushD.setSpeed(-speed);
+        pixelbrushM.setSpeed(-speed);
 
         int curPos = pixelbrush.getPosition();
         if (curPos == 144)
         { // means pixelbrushBB must be at post 287
                 pixelbrush.moveTo(0);
                 // pixelbrush.setSpeed(-speed); // brush moving speed
-                pixelbrushD.moveTo(287);
-                // pixelbrushD.setSpeed(-speed); // brush moving speed
+                pixelbrushM.moveTo(287);
+                // pixelbrushM.setSpeed(-speed); // brush moving speed
         }
 
         brushcolor.s = 255; // full saturation
@@ -593,12 +593,12 @@ void dripRead2()
         brushcolor.v = brightness; // random (peak) brighness
 
         pixelbrush.setColor(brushcolor);  // set new color to the brush
-        pixelbrushD.setColor(brushcolor); // set new color to the brush
+        pixelbrushM.setColor(brushcolor); // set new color to the brush
 
         FastLED.clear();
 
         pixelbrush.paint();  // paint the brush to the canvas (and update the brush, i.e. move it a little)
-        pixelbrushD.paint(); // paint the brush to the canvas (and update the brush, i.e. move it a little)
+        pixelbrushM.paint(); // paint the brush to the canvas (and update the brush, i.e. move it a little)
 
         pixelcanvas.transfer(); // transfer (add) the canvas to the FastLED
 
