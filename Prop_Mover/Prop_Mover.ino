@@ -33,6 +33,9 @@ struct CRGB leds[NUM_LEDS];
 FastLEDPainterCanvas pixelcanvas = FastLEDPainterCanvas(NUM_LEDS);  // create canvas, linked to the FastLED library (canvas must be created before the brush)
 FastLEDPainterBrush pixelbrush = FastLEDPainterBrush(&pixelcanvas); // crete brush, linked to the canvas to paint to
 
+// create an additional "double" brush, painting on the same canvas as the globally defined brush which ought to mirror the original for use with 288 leds.
+FastLEDPainterBrush pixelbrushD = FastLEDPainterBrush(&pixelcanvas); // crete brush, linked to the canvas to paint to
+
 // FOR BOUNCY BALLS ANIMATION
 // create additional brushes, painting on the same canvas as the globally defined brush
 FastLEDPainterBrush pixelbrushBB2 = FastLEDPainterBrush(&pixelcanvas); // crete brush, linked to the canvas to paint to
@@ -544,11 +547,11 @@ void dripRead2()
                 pixelbrush.setBounce(false);
                 pixelbrush.moveTo(0);
 
-                pixelbrushBB2.setFadeSpeed(90);
-                pixelbrushBB2.setFadein(false); // brightness will fade-in if set to true
-                pixelbrushBB2.setFadeout(true);
-                pixelbrushBB2.setBounce(false);
-                pixelbrushBB2.moveTo(287);
+                pixelbrushD.setFadeSpeed(90);
+                pixelbrushD.setFadein(false); // brightness will fade-in if set to true
+                pixelbrushD.setFadeout(true);
+                pixelbrushD.setBounce(false);
+                pixelbrushD.moveTo(287);
 
                 initialized = true;
                 Serial.print("DripRead2 init success");
@@ -571,15 +574,15 @@ void dripRead2()
         }
 
         pixelbrush.setSpeed(speed); // brush moving speed
-        pixelbrushBB2.setSpeed(-speed);
+        pixelbrushD.setSpeed(-speed);
 
         int curPos = pixelbrush.getPosition();
         if (curPos == 144)
         { // means pixelbrushBB must be at post 287
                 pixelbrush.moveTo(0);
                 // pixelbrush.setSpeed(-speed); // brush moving speed
-                pixelbrushBB2.moveTo(287);
-                // pixelbrushBB2.setSpeed(-speed); // brush moving speed
+                pixelbrushD.moveTo(287);
+                // pixelbrushD.setSpeed(-speed); // brush moving speed
         }
 
         brushcolor.s = 255; // full saturation
@@ -589,13 +592,13 @@ void dripRead2()
 
         brushcolor.v = brightness; // random (peak) brighness
 
-        pixelbrush.setColor(brushcolor);    // set new color to the brush
-        pixelbrushBB2.setColor(brushcolor); // set new color to the brush
+        pixelbrush.setColor(brushcolor);  // set new color to the brush
+        pixelbrushD.setColor(brushcolor); // set new color to the brush
 
         FastLED.clear();
 
-        pixelbrush.paint();    // paint the brush to the canvas (and update the brush, i.e. move it a little)
-        pixelbrushBB2.paint(); // paint the brush to the canvas (and update the brush, i.e. move it a little)
+        pixelbrush.paint();  // paint the brush to the canvas (and update the brush, i.e. move it a little)
+        pixelbrushD.paint(); // paint the brush to the canvas (and update the brush, i.e. move it a little)
 
         pixelcanvas.transfer(); // transfer (add) the canvas to the FastLED
 
