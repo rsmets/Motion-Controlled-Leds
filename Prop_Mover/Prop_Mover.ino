@@ -534,7 +534,8 @@ void saveAnimationNum(int number)
         EEPROM.write(ADDRESS_ANIMATION_NUM, number);
 }
 
-// Animation
+// Animation that should be used with daisy chain two strips together with the intention of using them back to back.
+// Ultimately, deciding not worth the extra power consumption when using a defused housing. Can do all the same animations with one strip.
 void dripReadMirror()
 {
         // Serial.print(F("in dripRead\n"));
